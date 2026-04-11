@@ -1,17 +1,11 @@
-from app.controllers.validation_controller import run_primary_sales_validation
+from fastapi import FastAPI
+from app.controllers.distributor_controller import router as distributor_router
+
+app = FastAPI(title="Demand Planning Agent")
+
+app.include_router(distributor_router)
 
 
-def main():
-    results = run_primary_sales_validation()
-
-    print("\n--- PRIMARY SALES VALIDATION RESULTS ---")
-    print("Total records:", results["total_records"])
-    print("Duplicate rows:", results["duplicate_rows"])
-    print("Negative sales values:", results["negative_sales_values"])
-    print("Priority distribution:", results["priority_distribution"])
-    print("Unique distributors:", results["unique_distributors"])
-    print("Cleaned file saved at:", results["cleaned_file_path"])
-
-
-if __name__ == "__main__":
-    main()
+@app.get("/")
+def health_check():
+    return {"message": "Demand Planning Agent is running"}
