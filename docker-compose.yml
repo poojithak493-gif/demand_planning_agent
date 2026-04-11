@@ -1,0 +1,134 @@
+# =============================================================
+# DEMAND PLANNING AGENT — Docker Compose
+# Services: FastAPI · PostgreSQL · FalkorDB · RedPanda
+# =============================================================
+
+version: "3.9"
+
+services:
+
+  # -----------------------------------------------------------
+  # 1. PostgreSQL — system of record
+  # -----------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: demand_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: demand_planning
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/postgres:/docker-entrypoint-initdb.d   # auto-runs demand_planning.sql on first start
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d demand_planning"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -----------------------------------------------------------
+  # 2. FalkorDB — graph database (Distributor ⇌ SKU)
+  # -----------------------------------------------------------
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: demand_falkordb
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+      - "3000:3000"    # FalkorDB browser UI
+    volumes:
+      - falkordb_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -----------------------------------------------------------
+  # 3. RedPanda — event bus (Kafka-compatible, no JVM)
+  # -----------------------------------------------------------
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: demand_redpanda
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp 1
+      - --memory 512M
+      - --reserve-memory 0M
+      - --node-id 0
+      - --check=false
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+      - --pandaproxy-addr 0.0.0.0:8082
+      - --advertise-pandaproxy-addr localhost:8082
+    ports:
+      - "9092:9092"      # Kafka-compatible API (external)
+      - "29092:29092"    # Kafka-compatible API (internal between containers)
+      - "8082:8082"      # Pandaproxy REST API
+      - "9644:9644"      # Admin API
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # -----------------------------------------------------------
+  # 4. RedPanda Console — UI to inspect topics/messages
+  # -----------------------------------------------------------
+  redpanda_console:
+    image: redpandadata/console:latest
+    container_name: demand_redpanda_console
+    restart: unless-stopped
+    environment:
+      KAFKA_BROKERS: redpanda:29092
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redpanda
+
+  # -----------------------------------------------------------
+  # 5. FastAPI — business services
+  # -----------------------------------------------------------
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: demand_fastapi
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/demand_planning
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: 6379
+      REDPANDA_BROKERS: redpanda:29092
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      falkordb:
+        condition: service_healthy
+      redpanda:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5s
+
+# =============================================================
+# VOLUMES
+# =============================================================
+volumes:
+  postgres_data:
+  falkordb_data:
+  redpanda_data:
