@@ -9,3 +9,7 @@ app.include_router(distributor_router)
 @app.get("/")
 def health_check():
     return {"message": "Demand Planning Agent is running"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

@@ -1,18 +1,29 @@
-import json
-from pathlib import Path
-from typing import Optional
+from sqlalchemy import text
+from app.core.database import SessionLocal
 
 
 class DistributorRepository:
-    def __init__(self) -> None:
-        self.file_path = Path("sample_data/distributors.json")
+    def get_by_code(self, distributor_code: str) -> dict | None:
+        query = text("""
+            SELECT
+                distributor_id,
+                distributor_code,
+                name,
+                email,
+                phone,
+                region,
+                priority,
+                is_active
+            FROM distributors
+            WHERE distributor_code = :distributor_code
+              AND is_active = TRUE
+            LIMIT 1
+        """)
 
-    def get_by_id(self, distributor_id: str) -> Optional[dict]:
-        with open(self.file_path, "r", encoding="utf-8") as file:
-            distributors = json.load(file)
+        with SessionLocal() as session:
+            row = session.execute(
+                query,
+                {"distributor_code": distributor_code}
+            ).mappings().first()
 
-        for distributor in distributors:
-            if distributor["distributor_id"] == distributor_id:
-                return distributor
-
-        return None
+            return dict(row) if row else None
