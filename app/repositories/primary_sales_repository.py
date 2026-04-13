@@ -1,16 +1,17 @@
-import os
-import pandas as pd
-
-INPUT_FILE = os.path.join("sample_data", "Primary_Sales.xlsx")
-OUTPUT_FOLDER = os.path.join("sample_data", "cleaned")
-OUTPUT_FILE = os.path.join(OUTPUT_FOLDER, "primary_sales_cleaned.xlsx")
+from sqlalchemy.orm import Session
+from app.models.primary_sales_model import PrimarySales
 
 
-def load_primary_sales() -> pd.DataFrame:
-    return pd.read_excel(INPUT_FILE)
+class PrimarySalesRepository:
+    def __init__(self, db: Session):
+        self.db = db
 
+    def get_all_sales(self):
+        return self.db.query(PrimarySales).all()
 
-def save_cleaned_primary_sales(df: pd.DataFrame) -> str:
-    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    df.to_excel(OUTPUT_FILE, index=False)
-    return OUTPUT_FILE
+    def get_sales_by_distributor(self, distributor_id: str):
+        return (
+            self.db.query(PrimarySales)
+            .filter(PrimarySales.distributor_id == distributor_id)
+            .all()
+        )

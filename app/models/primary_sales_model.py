@@ -1,12 +1,15 @@
-from dataclasses import dataclass
-from typing import Optional
+from sqlalchemy import Column, Integer, String, Numeric, Date
+from app.core.database import Base
 
 
-@dataclass
-class PrimarySalesRecord:
-    sku_name: Optional[str] = None
-    product_category_snapshot: Optional[str] = None
-    priority_flag: Optional[str] = None
-    distributor_id: Optional[int] = None
-    gross_dispatch_value: Optional[float] = None
-    transaction_date: Optional[str] = None
+class PrimarySales(Base):
+    __tablename__ = "primary_sales"
+
+    id = Column(Integer, primary_key=True, index=True)
+    distributor_id = Column(String(50), nullable=False)
+    sku_id = Column(String(50), nullable=False)
+    sku_name = Column(String(255), nullable=False)
+    category = Column(String(255), nullable=True)
+    order_qty = Column(Numeric, nullable=True)
+    order_value = Column(Numeric, nullable=True)
+    order_date = Column(Date, nullable=True)
