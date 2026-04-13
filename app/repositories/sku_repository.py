@@ -29,3 +29,30 @@ class SKURepository:
             ).mappings().all()
 
             return [dict(row) for row in rows]
+
+    def get_skus_by_ids(self, sku_ids: list[str]) -> dict[str, dict]:
+        normalized_ids = [str(sku_id) for sku_id in sku_ids if sku_id is not None]
+        if not normalized_ids:
+            return {}
+
+        query = text("""
+            SELECT
+                sku_id,
+                sku_code,
+                sku_name,
+                category
+            FROM skus
+            WHERE CAST(sku_id AS TEXT) = ANY(:sku_ids)
+              AND is_active = TRUE
+        """)
+
+        with SessionLocal() as session:
+            rows = session.execute(
+                query,
+                {"sku_ids": normalized_ids}
+            ).mappings().all()
+
+        return {
+            str(row["sku_id"]): dict(row)
+            for row in rows
+        }

@@ -1,10 +1,10 @@
 from temporalio import activity
 
 from app.core.database import SessionLocal
-from app.services.fetch_distributor_context_service import FetchDistributorContextService
-from app.services.sku_recommendation_service import SKURecommendationService
 from app.services.build_demand_email_service import BuildDemandEmailService
+from app.services.fetch_distributor_context_service import FetchDistributorContextService
 from app.services.send_demand_email_service import SendDemandEmailService
+from app.services.sku_recommendation_service import SKURecommendationService
 
 
 @activity.defn
