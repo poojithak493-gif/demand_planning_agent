@@ -6,8 +6,19 @@ from app.repositories.primary_sales_repository import PrimarySalesRepository
 from app.core.falkor_db import graph
 
 
+# --- IMPROVEMENT: Hardened escape() ---
+# Old version only handled backslashes and single quotes.
+# New version also strips newlines and carriage returns which would
+# break multi-line Cypher strings and cause silent query failures.
 def escape(value: str) -> str:
-    return str(value).replace("\\", "\\\\").replace("'", "\\'")
+    return (
+        str(value)
+        .replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\n", " ")
+        .replace("\r", " ")
+        .replace("`", "\\`")
+    )
 
 
 def build_graph():
