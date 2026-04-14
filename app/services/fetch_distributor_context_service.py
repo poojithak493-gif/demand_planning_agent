@@ -1,22 +1,31 @@
 from app.repositories.primary_sales_repository import PrimarySalesRepository
 from app.repositories.graph_repository import GraphRepository
+from app.repositories.distributor_repository import DistributorRepository
 
 
 class FetchDistributorContextService:
     def __init__(self, db):
         self.sales_repo = PrimarySalesRepository(db)
         self.graph_repo = GraphRepository()
+        self.distributor_repo = DistributorRepository(db)  # ✅ NEW
 
     def execute(self, distributor_id: str):
+
+        # 🔹 Fetch distributor master data
+        distributor = self.distributor_repo.get_by_distributor_id(distributor_id)
+
+        if not distributor:
+            raise ValueError(f"Distributor not found: {distributor_id}")
+
+        # 🔹 Existing logic (UNCHANGED)
         sales_rows = self.sales_repo.get_sales_by_distributor(distributor_id)
         existing_skus = self.graph_repo.get_existing_skus_for_distributor(distributor_id)
 
-        # --- IMPROVEMENT: Aggregate demand signals per SKU ---
-        # Previously only row count was returned, giving downstream services
-        # no real data to make demand-aware recommendations.
+        # --- Aggregate demand signals per SKU ---
         sku_demand_map = {}
         for row in sales_rows:
             sku_id = row.sku_id
+
             if sku_id not in sku_demand_map:
                 sku_demand_map[sku_id] = {
                     "sku_id": sku_id,
@@ -45,7 +54,7 @@ class FetchDistributorContextService:
                 else 0
             )
 
-        # Convert dates to ISO strings for JSON-safety
+        # Convert dates to ISO strings
         sku_demand_list = []
         for entry in sku_demand_map.values():
             entry = entry.copy()
@@ -53,10 +62,15 @@ class FetchDistributorContextService:
                 entry["last_purchase_date"] = entry["last_purchase_date"].isoformat()
             sku_demand_list.append(entry)
 
+        # 🔹 FINAL RETURN (UPDATED)
         return {
-            "distributor_id": distributor_id,
-            "historical_rows_count": len(sales_rows),      # kept for backward compat
+            "distributor_id": distributor.distributor_id,
+            "distributor_name": distributor.distributor_name,   # ✅ NEW
+            "email": distributor.email,                         # ✅ NEW
+            "region": distributor.region,                       # ✅ NEW
+
+            "historical_rows_count": len(sales_rows),
             "existing_skus": existing_skus,
-            "sku_demand_signals": sku_demand_list,          # NEW: per-SKU demand aggregates
-            "unique_skus_purchased": len(sku_demand_map),   # NEW: quick count
+            "sku_demand_signals": sku_demand_list,
+            "unique_skus_purchased": len(sku_demand_map),
         }
