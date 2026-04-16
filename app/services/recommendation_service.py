@@ -66,35 +66,24 @@ class RecommendationService:
         if not raw_recommendations:
             return []
 
-        sku_ids = [
-            str(item.get("sku_id"))
-            for item in raw_recommendations
-            if item.get("sku_id") is not None
-        ]
-        sku_details = self.sku_repository.get_skus_by_ids(sku_ids)
-
         normalized_recommendations = []
         for item in raw_recommendations:
-            normalized = self._normalize_graph_recommendation(item, sku_details)
+            normalized = self._normalize_graph_recommendation(item)
             if normalized:
                 normalized_recommendations.append(normalized)
 
         return normalized_recommendations
 
     @staticmethod
-    def _normalize_graph_recommendation(
-        recommendation: dict,
-        sku_details: dict[str, dict],
-    ) -> dict | None:
+    def _normalize_graph_recommendation(recommendation: dict) -> dict | None:
         sku_id = recommendation.get("sku_id")
         if sku_id is None:
             return None
 
         sku_id_str = str(sku_id)
-        details = sku_details.get(sku_id_str, {})
-        sku_code = details.get("sku_code") or recommendation.get("sku_code") or sku_id_str
-        sku_name = details.get("sku_name") or recommendation.get("sku_name") or sku_code
-        category = details.get("category") or recommendation.get("category")
+        sku_code = recommendation.get("sku_code") or sku_id_str
+        sku_name = recommendation.get("sku_name") or sku_code
+        category = recommendation.get("category")
         raw_score = recommendation.get("score", 0)
 
         try:

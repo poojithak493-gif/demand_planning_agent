@@ -18,8 +18,7 @@ falkordb==1.0.9
 # RedPanda / Kafka
 kafka-python==2.0.2
 
-# Email (Resend)
-resend==0.7.0
+
 
 # Data processing
 pandas==2.2.2
