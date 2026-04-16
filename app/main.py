@@ -11,6 +11,9 @@ def main():
     print("Priority distribution:", results["priority_distribution"])
     print("Unique distributors:", results["unique_distributors"])
     print("Cleaned file saved at:", results["cleaned_file_path"])
+    print("\n--- SKU RECOMMENDATIONS ---")
+    for r in results["recommendations"][:10]:
+        print(r)
 
 
 if __name__ == "__main__":
