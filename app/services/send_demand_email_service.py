@@ -1,20 +1,20 @@
-from app.services.resend_client import ResendEmailService
+from app.services.postal_client import PostalClient
 
 
 class SendDemandEmailService:
     """
-    Sends the demand planning email to the distributor using Resend.
+    Sends the demand planning email to the distributor using Postal.
 
     Input:
         distributor_context: dict (from FetchDistributorContextService)
         email_payload: dict (from BuildDemandEmailService)
 
     Output:
-        Resend API response
+        Postal API response
     """
 
     def __init__(self):
-        self.email_service = ResendEmailService()
+        self.email_service = PostalClient()
 
     def execute(self, distributor_context: dict, email_payload: dict):
 
@@ -25,6 +25,7 @@ class SendDemandEmailService:
 
         subject = email_payload.get("subject")
         body = email_payload.get("body")
+        html_body = email_payload.get("html_body")
 
         if not subject or not body:
             raise ValueError("Email payload missing subject or body")
@@ -32,12 +33,13 @@ class SendDemandEmailService:
         response = self.email_service.send_email(
             to_email=distributor_email,
             subject=subject,
-            body=body
+            plain_body=body,
+            html_body=html_body
         )
 
         return {
             "status": "EMAIL_SENT",
             "distributor_id": distributor_context.get("distributor_id"),
             "email": distributor_email,
-            "resend_response": response
+            "postal_response": response
         }

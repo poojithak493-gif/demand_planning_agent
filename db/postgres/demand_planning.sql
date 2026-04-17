@@ -318,26 +318,15 @@ CREATE TRIGGER set_updated_at_demand_records
     EXECUTE FUNCTION trigger_set_updated_at();
 
 
--- =============================================================
--- OPTIONAL SEED DATA: DISTRIBUTORS
--- Uncomment if needed
--- =============================================================
--- INSERT INTO distributors (
---     distributor_code,
---     name,
---     email,
---     region,
---     priority
--- )
--- VALUES
--- ('D01', 'Revan', 'revanbejagam@gmail.com', 'South', 'High'),
--- ('D02', 'Rishitha', 'rishithareddyc2002@gmail.com', 'South', 'Medium'),
--- ('D03', 'Phani', 'lingaphani21@gmail.com', 'South', 'Medium')
--- ON CONFLICT (distributor_code) DO NOTHING;
-
-
--- =============================================================
--- DONE
--- To apply:
--- psql -U postgres -d demand_planning -f db/demand_planning.sql
--- =============================================================
+INSERT INTO distributors (
+    distributor_code,
+    name,
+    email,
+    region,
+    priority
+)
+VALUES
+('D01', 'Revan', 'revanbejagam@gmail.com', 'South', 'High'),
+('D02', 'Rishitha', 'rishithareddyc2002@gmail.com', 'South', 'Medium'),
+('D03', 'Phani', 'lingaphani21@gmail.com', 'South', 'Medium')
+ON CONFLICT (distributor_code) DO NOTHING;

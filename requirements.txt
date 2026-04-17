@@ -1,41 +1,23 @@
-# =============================================================
-# DEMAND PLANNING AGENT — Python Dependencies
-# =============================================================
-
-# FastAPI core
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
 python-multipart==0.0.9
 
-# PostgreSQL
 sqlalchemy==2.0.30
 psycopg2-binary==2.9.9
 alembic==1.13.1
 
-# FalkorDB
 falkordb==1.0.9
-
-# RedPanda / Kafka
 kafka-python==2.0.2
 
-# Email (Resend)
-resend==0.7.0
-
-# Data processing
 pandas==2.2.2
 openpyxl==3.1.2
 numpy==1.26.4
 
-# Validation
 pydantic==2.7.1
 pydantic-settings==2.2.1
 
-# HTTP client
+requests==2.32.3
 httpx==0.27.0
 
-# Environment
 python-dotenv==1.0.1
-
-# Utilities
-uuid==1.30
 pyarrow==16.0.0
