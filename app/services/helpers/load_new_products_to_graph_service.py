@@ -1,5 +1,5 @@
 from app.core.falkor_db import graph
-from app.services.load_new_products_service import LoadNewProductsService
+from app.services.helpers.load_new_products_service import LoadNewProductsService
 
 
 # --- IMPROVEMENT: Same hardened escape() as build_falkor_graph.py ---

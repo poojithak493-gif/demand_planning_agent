@@ -28,11 +28,21 @@ class FetchDistributorContextService:
                 }
 
             entry = sku_demand_map[sku_id]
-            entry["total_quantity"] += row.gross_dispatch_value or 0
+            quantity = (
+                getattr(row, "sales_qty", None)
+                or getattr(row, "order_qty", None)
+                or getattr(row, "gross_dispatch_value", None)
+                or 0
+            )
+            entry["total_quantity"] += quantity
             entry["order_count"] += 1
 
             # Track most recent purchase date
-            txn_date = getattr(row, "transaction_date", None)
+            txn_date = (
+                getattr(row, "sale_date", None)
+                or getattr(row, "order_date", None)
+                or getattr(row, "transaction_date", None)
+            )
             if txn_date:
                 if entry["last_purchase_date"] is None or txn_date > entry["last_purchase_date"]:
                     entry["last_purchase_date"] = txn_date
