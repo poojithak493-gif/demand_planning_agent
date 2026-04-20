@@ -1,16 +1,15 @@
-from pydantic_settings import BaseSettings
-from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     # =========================
-    # App Info (KEEP THIS)
+    # App Info
     # =========================
     APP_NAME: str = "Demand Planning Agent"
     APP_VERSION: str = "1.0.0"
 
     # =========================
-    # PostgreSQL Config
+    # PostgreSQL
     # =========================
     POSTGRES_HOST: str
     POSTGRES_PORT: int
@@ -19,14 +18,14 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str
 
     # =========================
-    # FalkorDB Config
+    # FalkorDB
     # =========================
     FALKOR_HOST: str
     FALKOR_PORT: int
     FALKOR_GRAPH: str
 
     # =========================
-    # Postal Config (NEW)
+    # Postal (OLD - keep it)
     # =========================
     POSTAL_BASE_URL: str
     POSTAL_SERVER_KEY: str
@@ -34,27 +33,14 @@ class Settings(BaseSettings):
     POSTAL_WEBHOOK_URL: str
 
     # =========================
-    # Database URL Builder
+    # Postal SMTP (NEW - ADD THIS)
     # =========================
-    @property
-    def DATABASE_URL(self) -> str:
-        return (
-            f"postgresql://{self.POSTGRES_USER}:"
-            f"{self.POSTGRES_PASSWORD}@"
-            f"{self.POSTGRES_HOST}:"
-            f"{self.POSTGRES_PORT}/"
-            f"{self.POSTGRES_DB}"
-        )
+    POSTAL_SMTP_HOST: str
+    POSTAL_SMTP_PORT: int
+    POSTAL_SMTP_USER: str
+    POSTAL_SMTP_PASS: str
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(env_file=".env")
 
 
-# Singleton instance
-@lru_cache()
-def get_settings():
-    return Settings()
-
-
-settings = get_settings()
+settings = Settings()

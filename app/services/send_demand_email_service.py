@@ -1,45 +1,77 @@
-from app.services.postal_client import PostalClient
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+from app.core.config import settings
 
 
-class SendDemandEmailService:
+def send_email(to_email: str, subject: str, body: str) -> dict:
     """
-    Sends the demand planning email to the distributor using Postal.
-
-    Input:
-        distributor_context: dict (from FetchDistributorContextService)
-        email_payload: dict (from BuildDemandEmailService)
-
-    Output:
-        Postal API response
+    Send a single email using Postal SMTP
     """
 
-    def __init__(self):
-        self.email_service = PostalClient()
+    try:
+        # Create email
+        msg = MIMEMultipart()
+        msg["From"] = settings.POSTAL_FROM_EMAIL
+        msg["To"] = to_email
+        msg["Subject"] = subject
 
-    def execute(self, distributor_context: dict, email_payload: dict):
+        msg.attach(MIMEText(body, "plain"))
 
-        distributor_email = distributor_context.get("email")
-
-        if not distributor_email:
-            raise ValueError("Distributor email not found in context")
-
-        subject = email_payload.get("subject")
-        body = email_payload.get("body")
-        html_body = email_payload.get("html_body")
-
-        if not subject or not body:
-            raise ValueError("Email payload missing subject or body")
-
-        response = self.email_service.send_email(
-            to_email=distributor_email,
-            subject=subject,
-            plain_body=body,
-            html_body=html_body
-        )
+        # Connect to SMTP server
+        with smtplib.SMTP(settings.POSTAL_SMTP_HOST, settings.POSTAL_SMTP_PORT) as server:
+            server.login(settings.POSTAL_SMTP_USER, settings.POSTAL_SMTP_PASS)
+            server.send_message(msg)
 
         return {
-            "status": "EMAIL_SENT",
-            "distributor_id": distributor_context.get("distributor_id"),
-            "email": distributor_email,
-            "postal_response": response
+            "status": "success",
+            "message": f"Email sent to {to_email}"
         }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+# 🚀 BONUS: Send to multiple distributors (for your project)
+def send_bulk_emails(distributors: list) -> dict:
+    """
+    Send emails to multiple distributors
+    """
+
+    results = []
+
+    for distributor in distributors:
+        email = distributor.get("email")
+        name = distributor.get("name", "Distributor")
+
+        subject = "Demand Recommendation"
+
+        body = f"""
+Hello {name},
+
+Based on your recent sales data, we recommend the following products:
+
+- Product A
+- Product B
+- Product C
+
+Please reply with your required quantity.
+
+Regards,  
+Demand Planning Agent
+"""
+
+        result = send_email(email, subject, body)
+        results.append({
+            "email": email,
+            "status": result["status"]
+        })
+
+    return {
+        "status": "completed",
+        "results": results
+    }

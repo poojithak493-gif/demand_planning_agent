@@ -1,49 +1,44 @@
-from fastapi import FastAPI, HTTPException
-
+from fastapi import FastAPI
 from app.core.config import settings
-from app.controllers.postal_webhook_controller import router as postal_webhook_router
-from app.services.postal_client import PostalClient
+from app.services.send_demand_email_service import send_email, send_bulk_emails
 
 app = FastAPI(
     title=settings.APP_NAME,
-    version=settings.APP_VERSION,
+    version=settings.APP_VERSION
 )
-
-# Register Postal webhook routes
-app.include_router(postal_webhook_router)
 
 
 @app.get("/")
-def root():
+def home():
     return {
-        "message": "API is running",
-        "app_name": settings.APP_NAME,
-        "version": settings.APP_VERSION,
+        "message": f"{settings.APP_NAME} is running",
+        "version": settings.APP_VERSION
     }
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+def health_check():
+    return {
+        "status": "success",
+        "message": "Application startup complete."
+    }
 
 
-@app.get("/send-email/{email}")
-def send_email(email: str):
-    try:
-        postal_client = PostalClient()
+@app.get("/send-test")
+def send_test():
+    return send_email(
+        to_email="demo@postal.local",
+        subject="Test Email from Demand Planning Agent",
+        body="Hello, this is a test email sent from FastAPI using Postal SMTP."
+    )
 
-        response = postal_client.send_email(
-            to_email=email,
-            subject="Demand Planning Test Email",
-            plain_body=f"Hello {email}, this is a test email from Demand Planning Agent.",
-            html_body=f"<p>Hello {email}, this is a test email from Demand Planning Agent 🚀</p>",
-        )
 
-        return {
-            "status": "success",
-            "provider": "postal",
-            "response": response,
-        }
+@app.get("/send-bulk")
+def send_bulk():
+    distributors = [
+        {"name": "D01", "email": "rishithareddyc2002@gmail.com"},
+        {"name": "D02", "email": "lingaphani21@gmail.com"},
+        {"name": "D03", "email": "revanbejagam@gmail.com"},
+    ]
 
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to send email: {exc}")
+    return send_bulk_emails(distributors)

@@ -18,8 +18,8 @@ class PostalClient:
         self.server_key = settings.POSTAL_SERVER_KEY
         self.from_email = settings.POSTAL_FROM_EMAIL
 
-        # Toggle this flag for simulation
-        self.simulation_mode = True   # 👉 set False in production
+        # 🔥 IMPORTANT: set False for real sending
+        self.simulation_mode = False
 
     def send_email(
         self,
@@ -50,7 +50,7 @@ class PostalClient:
 
         payload = {
             "from": self.from_email,
-            "to": to_email,
+            "to": [to_email],  # ✅ MUST be list
             "subject": subject,
             "plain_body": plain_body,
         }
@@ -63,8 +63,28 @@ class PostalClient:
             "Content-Type": "application/json",
         }
 
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        try:
+            response = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=30
+            )
 
-        response.raise_for_status()
+            print("Postal Status Code:", response.status_code)
+            print("Postal Response:", response.text)
 
-        return response.json()
+            response.raise_for_status()
+
+            return {
+                "status": "SUCCESS",
+                "data": response.json()
+            }
+
+        except requests.exceptions.RequestException as e:
+            print("❌ Postal Error:", str(e))
+
+            return {
+                "status": "FAILED",
+                "error": str(e)
+            }
