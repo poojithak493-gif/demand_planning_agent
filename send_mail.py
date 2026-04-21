@@ -60,7 +60,8 @@ def format_recommendations(recommended_products):
 
 
 def build_email_body(distributor_id, recommended_products_text):
-    return f"""Dear Distributor,
+    return f"""
+Dear Distributor,
 
 Greetings from Lipton Enterprises.
 
@@ -105,7 +106,11 @@ if __name__ == "__main__":
         distributor_email = distributor["email"]
 
         try:
-            recommended_products = get_recommended_products(distributor_id, graph_limit=5, excel_limit=5)
+            recommended_products = get_recommended_products(
+                distributor_id,
+                graph_limit=5,
+                excel_limit=5
+            )
         except Exception as e:
             print(f"⚠ Could not fetch recommendations for {distributor_id}: {e}")
             recommended_products = []
@@ -113,9 +118,12 @@ if __name__ == "__main__":
         recommended_products_text = format_recommendations(recommended_products)
         body = build_email_body(distributor_id, recommended_products_text)
 
-        send_email(
-            to_email=distributor_email,
-            subject=subject,
-            body=body,
-            attachment_path=None
-        )
+        try:
+            send_email(
+                to_email=distributor_email,
+                subject=subject,
+                body=body,
+                attachment_path=None
+            )
+        except Exception as e:
+            print(f"❌ Failed to send email to {distributor_email}: {e}")
