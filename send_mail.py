@@ -3,11 +3,8 @@ import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
 
-# Import recommendation function from your service
-# Make sure this function exists in app/services/sku_recommendation_service.py
 from app.services.sku_recommendation_service import get_recommended_products
 
-# Load .env values
 load_dotenv()
 
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
@@ -29,7 +26,6 @@ def send_email(to_email, subject, body, attachment_path=None):
     msg["Subject"] = subject
     msg.set_content(body)
 
-    # Attach file only if provided
     if attachment_path:
         if not os.path.exists(attachment_path):
             raise FileNotFoundError(f"Attachment file not found: {attachment_path}")
@@ -45,7 +41,6 @@ def send_email(to_email, subject, body, attachment_path=None):
             filename=file_name
         )
 
-    # Send email using Gmail SMTP
     with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as smtp:
         smtp.login(EMAIL_ADDRESS, EMAIL_APP_PASSWORD)
         smtp.send_message(msg)
@@ -54,12 +49,6 @@ def send_email(to_email, subject, body, attachment_path=None):
 
 
 def format_recommendations(recommended_products):
-    """
-    Converts list of product names into numbered text for email body.
-    Example:
-    1. Product A
-    2. Product B
-    """
     if not recommended_products:
         return "No recommendations available."
 
@@ -70,35 +59,8 @@ def format_recommendations(recommended_products):
     return "\n".join(lines)
 
 
-if __name__ == "__main__":
-
-    distributors = [
-        {"id": "D001", "email": "revanbejagam@gmail.com"},
-        {"id": "D002", "email": "rishithareddyc2002@gmail.com"},
-        {"id": "D003", "email": "Saherwardi.mustafa@gmail.com"},
-        {"id": "D004", "email": "lingaphani21@gmail.com"},
-        {"id": "D005", "email": "poojithak493@gmail.com"},
-    ]
-
-    # Constant subject
-    subject = "Demand Request for Upcoming Month"
-
-    for d in distributors:
-        distributor_id = d["id"]
-        distributor_email = d["email"]
-
-        # Get recommended products for this distributor
-        try:
-            recommended_products = get_recommended_products(distributor_id)
-        except Exception as e:
-            print(f"⚠ Could not fetch recommendations for {distributor_id}: {e}")
-            recommended_products = []
-
-        recommended_products_text = format_recommendations(recommended_products)
-
-        # Constant body + variable distributor ID + dynamic recommendations
-        body = f"""
-Dear Distributor,
+def build_email_body(distributor_id, recommended_products_text):
+    return f"""Dear Distributor,
 
 Greetings from Lipton Enterprises.
 
@@ -125,6 +87,31 @@ Best Regards,
 Demand Planning Team
 Lipton Enterprises
 """
+
+
+if __name__ == "__main__":
+    distributors = [
+        {"id": "D01", "email": "revanbejagam@gmail.com"},
+        {"id": "D02", "email": "rishithareddyc2002@gmail.com"},
+        {"id": "D03", "email": "Saherwardi.mustafa@gmail.com"},
+        {"id": "D04", "email": "lingaphani21@gmail.com"},
+        {"id": "D05", "email": "poojithak493@gmail.com"},
+    ]
+
+    subject = "Demand Request for Upcoming Month"
+
+    for distributor in distributors:
+        distributor_id = distributor["id"]
+        distributor_email = distributor["email"]
+
+        try:
+            recommended_products = get_recommended_products(distributor_id, graph_limit=5, excel_limit=5)
+        except Exception as e:
+            print(f"⚠ Could not fetch recommendations for {distributor_id}: {e}")
+            recommended_products = []
+
+        recommended_products_text = format_recommendations(recommended_products)
+        body = build_email_body(distributor_id, recommended_products_text)
 
         send_email(
             to_email=distributor_email,
