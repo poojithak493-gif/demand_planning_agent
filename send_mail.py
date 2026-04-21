@@ -73,11 +73,11 @@ def format_recommendations(recommended_products):
 if __name__ == "__main__":
 
     distributors = [
-        {"id": "D001", "email": "revanbejagam@gmail.com"},
-        {"id": "D002", "email": "rishithareddyc2002@gmail.com"},
-        {"id": "D003", "email": "Saherwardi.mustafa@gmail.com"},
-        {"id": "D004", "email": "lingaphani21@gmail.com"},
-        {"id": "D005", "email": "poojithak493@gmail.com"},
+        {"id": "D01", "email": "revanbejagam@gmail.com"},
+        {"id": "D02", "email": "rishithareddyc2002@gmail.com"},
+        {"id": "D03", "email": "Saherwardi.mustafa@gmail.com"},
+        {"id": "D04", "email": "lingaphani21@gmail.com"},
+        {"id": "D05", "email": "poojithak493@gmail.com"},
     ]
 
     # Constant subject
