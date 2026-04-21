@@ -57,6 +57,33 @@ class SKURepository:
             for row in rows
         }
 
+    def get_skus_by_codes(self, sku_codes: list[str]) -> dict[str, dict]:
+        normalized_codes = [str(sku_code).strip().upper() for sku_code in sku_codes if sku_code]
+        if not normalized_codes:
+            return {}
+
+        query = text("""
+            SELECT
+                sku_id,
+                sku_code,
+                sku_name,
+                category
+            FROM skus
+            WHERE UPPER(sku_code) = ANY(:sku_codes)
+              AND is_active = TRUE
+        """)
+
+        with SessionLocal() as session:
+            rows = session.execute(
+                query,
+                {"sku_codes": normalized_codes}
+            ).mappings().all()
+
+        return {
+            str(row["sku_code"]).upper(): dict(row)
+            for row in rows
+        }
+
     def get_distributor_recommendation_profile(
         self,
         distributor_code: str,

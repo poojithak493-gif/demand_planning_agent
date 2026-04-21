@@ -34,16 +34,28 @@ class ValidationResultResponse(BaseModel):
 class WeeklyDemandLine(BaseModel):
     sku_code: str
     monthly_quantity: int
-    weekly_quantities: List[int] = Field(..., min_length=4, max_length=4)
+    week1_qty: int
+    week2_qty: int
+    week3_qty: int
+    week4_qty: int
 
 
 class WeeklyDemandPlanResponse(BaseModel):
     distributor_code: str
     weekly_plan: List[WeeklyDemandLine]
-    week1_qty: int
-    week2_qty: int
-    week3_qty: int
-    week4_qty: int
+
+
+class SavedStatusResponse(BaseModel):
+    saved: bool
+    inserted_rows: int
+    cycle_id: str | None = None
+
+
+class ProcessReplyResponse(BaseModel):
+    parsed_reply: ParsedReplyResponse
+    validation_result: ValidationResultResponse
+    weekly_demand_plan: WeeklyDemandPlanResponse
+    saved_status: SavedStatusResponse
 
 
 class CombinedDemandCycleResponse(BaseModel):

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException
-from app.schemas.demand_schema import CombinedDemandCycleResponse
+from app.schemas.demand_schema import CombinedDemandCycleResponse, ProcessReplyResponse
 from app.schemas.distributor_schema import (
     DistributorContextResponse,
     DemandPlanResponse,
     ParsedReplyRequest,
+    ProcessReplyRequest,
     ReplyProcessingResponse,
     RecommendationEmailPayloadResponse,
     SKURecommendationResponse,
@@ -58,6 +59,20 @@ def get_email_payload(distributor_code: str):
 
 
 @router.post(
+    "/{distributor_code}/process-reply",
+    response_model=ProcessReplyResponse,
+)
+def process_reply(distributor_code: str, request: ProcessReplyRequest):
+    try:
+        return demand_cycle_service.process_reply(
+            distributor_code=distributor_code,
+            email_body=request.email_body,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post(
     "/{distributor_code}/reply-plan",
     response_model=ReplyProcessingResponse,
 )
@@ -73,6 +88,26 @@ def process_distributor_reply(
 
     try:
         return demand_plan_service.process_reply(
+            distributor_code,
+            reply_request.model_dump(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post(
+    "/{distributor_code}/demand-cycle",
+    response_model=CombinedDemandCycleResponse,
+)
+def process_demand_cycle(distributor_code: str, reply_request: ParsedReplyRequest):
+    if reply_request.distributor_code != distributor_code:
+        raise HTTPException(
+            status_code=400,
+            detail="Path distributor_code must match payload distributor_code",
+        )
+
+    try:
+        return demand_cycle_service.process_reply_cycle(
             distributor_code,
             reply_request.model_dump(),
         )
