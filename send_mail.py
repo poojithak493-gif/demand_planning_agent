@@ -3,6 +3,8 @@ import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
 
+from app.services.sku_recommendation_service import get_recommended_products
+
 load_dotenv()
 
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
@@ -10,7 +12,8 @@ EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
 
-ATTACHMENT_FILE = "DEMAND.xlsx"
+# Excel attachment path
+DEMAND_ATTACHMENT_PATH = r"C:\Users\rishi\OneDrive\Documents\GitHub\demand_planning_agent\DEMAND.xlsx"
 
 
 def send_email(to_email, subject, body, attachment_path=None):
@@ -34,6 +37,7 @@ def send_email(to_email, subject, body, attachment_path=None):
             file_data = f.read()
             file_name = os.path.basename(attachment_path)
 
+        # Proper MIME type for .xlsx
         msg.add_attachment(
             file_data,
             maintype="application",
@@ -59,20 +63,8 @@ def format_recommendations(recommended_products):
     return "\n".join(lines)
 
 
-def get_dummy_recommendations(distributor_id):
-    demo_data = {
-        "D01": ["Beng Beng Wafer", "Malkist Cheese", "Product A", "Product B", "Product C"],
-        "D02": ["Malkist Cheese", "Product D", "Product E", "Product F", "Product G"],
-        "D03": ["Beng Beng Wafer", "Product H", "Product I", "Product J", "Product K"],
-        "D04": ["Product L", "Product M", "Product N", "Product O", "Product P"],
-        "D05": ["Product Q", "Product R", "Product S", "Product T", "Product U"],
-    }
-    return demo_data.get(distributor_id, ["No recommendations available"])
-
-
 def build_email_body(distributor_id, recommended_products_text):
-    return f"""
-Dear Distributor,
+    return f"""Dear Distributor,
 
 Greetings from Lipton Enterprises.
 
@@ -83,15 +75,16 @@ Your Distributor ID: {distributor_id}
 Best Recommended Products:
 {recommended_products_text}
 
-Please provide the expected demand for the next month in the following format:
+Please provide the expected demand for the next month in any one of the following ways:
 
+1. Reply directly in email text format:
 Product Name - Quantity
 
 Example:
 Product A - 100
 Product B - 250
 
-You may also fill in the attached Excel file and reply back to this email.
+2. Or fill in the attached Excel file and send it back as a reply.
 
 Kindly ensure the details are accurate so that we can plan inventory and supply efficiently.
 
@@ -113,13 +106,25 @@ if __name__ == "__main__":
     ]
 
     subject = "Demand Request for Upcoming Month"
-    attachment_path = os.path.join(os.getcwd(), ATTACHMENT_FILE)
+
+    # Check attachment once before sending all emails
+    if not os.path.exists(DEMAND_ATTACHMENT_PATH):
+        raise FileNotFoundError(f"DEMAND.xlsx file not found at: {DEMAND_ATTACHMENT_PATH}")
 
     for distributor in distributors:
         distributor_id = distributor["id"]
         distributor_email = distributor["email"]
 
-        recommended_products = get_dummy_recommendations(distributor_id)
+        try:
+            recommended_products = get_recommended_products(
+                distributor_id,
+                graph_limit=5,
+                excel_limit=5
+            )
+        except Exception as e:
+            print(f"⚠ Could not fetch recommendations for {distributor_id}: {e}")
+            recommended_products = []
+
         recommended_products_text = format_recommendations(recommended_products)
         body = build_email_body(distributor_id, recommended_products_text)
 
@@ -128,7 +133,7 @@ if __name__ == "__main__":
                 to_email=distributor_email,
                 subject=subject,
                 body=body,
-                attachment_path=attachment_path
+                attachment_path=DEMAND_ATTACHMENT_PATH
             )
         except Exception as e:
             print(f"❌ Failed to send email to {distributor_email}: {e}")

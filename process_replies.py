@@ -1,52 +1,120 @@
-from read_replies import read_distributor_replies
-from parse_replies import parse_reply_body
-from save_to_postgres import create_table, save_demand
+from pprint import pprint
+
+from read_replies import read_unseen_replies
+from save_to_postgres import save_parsed_reply
+
+from app.services.reply_parser_service import parse_reply
+from app.services.attachment_parser_service import (
+    parse_excel_file,
+    is_excel_attachment,
+)
+
+from app.data.sku_data import load_sku_data
 
 
-def process_email_replies():
-    # Step 1: Ensure DB table exists
-    create_table()
+PRIMARY_SALES_FILE = "sample_data/Primary_Sales.xlsx"
+RECOMMENDED_PRODUCTS_FILE = "sample_data/30_Recommended_New_Products.xlsx"
 
-    # Step 2: Read distributor replies
-    emails = read_distributor_replies()
+
+def merge_attachment_items(parsed_data, attachment_items):
+    """
+    Rules:
+    1. If no attachment items -> keep text parsed result
+    2. If attachment items exist -> Excel becomes primary source
+    3. If text also has valid items, keep them only if SKU is not already in Excel
+    """
+    if not attachment_items:
+        return parsed_data
+
+    text_items = parsed_data.get("items", []) or []
+
+    final_items = []
+    excel_sku_ids = set()
+
+    for item in attachment_items:
+        final_items.append(item)
+        if item.get("sku_id"):
+            excel_sku_ids.add(item["sku_id"])
+
+    for item in text_items:
+        sku_id = item.get("sku_id")
+        if sku_id and sku_id not in excel_sku_ids:
+            final_items.append(item)
+
+    parsed_data["items"] = final_items
+    parsed_data["reply_type"] = "demand"
+    parsed_data["needs_followup"] = False
+    parsed_data["notes"] = "Excel attachment used as primary source."
+
+    if parsed_data.get("confidence", 0) < 0.95:
+        parsed_data["confidence"] = 0.95
+
+    return parsed_data
+
+
+def process_all_replies():
+    print("Loading SKU master data...")
+
+    load_sku_data(
+        primary_sales_file=PRIMARY_SALES_FILE,
+        recommended_products_file=RECOMMENDED_PRODUCTS_FILE
+    )
+
+    print("SKU data loaded successfully")
+
+    emails = read_unseen_replies()
 
     if not emails:
-        print("No distributor replies to process.")
+        print("No unread replies found.")
         return
 
-    # Step 3: Process each email
-    for mail in emails:
-        distributor_id = mail["distributor_id"]
-        distributor_email = mail["from_email"]
-        body = mail["body"]
+    print(f"Found {len(emails)} email(s)")
 
-        print(f"\nProcessing email from {distributor_email} ({distributor_id})")
+    for index, item in enumerate(emails, start=1):
+        print("=" * 80)
+        print(f"Processing Email #{index}")
+        print("Message ID:", item["message_id"])
+        print("From:", item["from_email"])
+        print("Subject:", item["subject"])
+        print("Body:")
+        print(item["body"])
+        print("Attachments:", item.get("attachment_paths", []))
+        print("-" * 80)
 
-        # Step 4: Parse text body
-        parsed_result = parse_reply_body(body)
+        # Parse body text
+        parsed = parse_reply(
+            from_email=item["from_email"],
+            body=item["body"]
+        )
 
-        parsed_items = parsed_result["parsed_items"]
-        unparsed_lines = parsed_result["unparsed_lines"]
+        # Parse Excel attachments
+        attachment_items = []
+        for attachment_path in item.get("attachment_paths", []):
+            if is_excel_attachment(attachment_path):
+                print(f"Parsing attachment: {attachment_path}")
+                try:
+                    excel_items = parse_excel_file(attachment_path)
+                    print(f"Parsed {len(excel_items)} items from Excel")
+                    attachment_items.extend(excel_items)
+                except Exception as exc:
+                    print(f"Error parsing Excel: {exc}")
 
-        # Step 5: Save parsed items to DB
-        for item in parsed_items:
-            product_name = item["product_name"]
-            quantity = item["quantity"]
+        # Merge results
+        parsed = merge_attachment_items(parsed, attachment_items)
 
-            save_demand(
-                distributor_email=distributor_email,
-                product_name=product_name,
-                quantity=quantity
-            )
+        print("Final Parsed Output:")
+        pprint(parsed)
 
-            print(f"✅ Saved: {product_name} - {quantity}")
+        save_parsed_reply(
+            raw_email=item,
+            parsed_data=parsed
+        )
 
-        # Step 6: Show unparsed lines (for debugging)
-        if unparsed_lines:
-            print("⚠ Unparsed lines:")
-            for line in unparsed_lines:
-                print(f"- {line}")
+        if parsed.get("needs_followup"):
+            print("Follow-up required for this reply.")
+
+        print("=" * 80)
 
 
 if __name__ == "__main__":
-    process_email_replies()
+    process_all_replies()
