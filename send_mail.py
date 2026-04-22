@@ -3,14 +3,14 @@ import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
 
-from app.services.sku_recommendation_service import get_recommended_products
-
 load_dotenv()
 
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
+
+ATTACHMENT_FILE = "DEMAND.xlsx"
 
 
 def send_email(to_email, subject, body, attachment_path=None):
@@ -37,7 +37,7 @@ def send_email(to_email, subject, body, attachment_path=None):
         msg.add_attachment(
             file_data,
             maintype="application",
-            subtype="octet-stream",
+            subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             filename=file_name
         )
 
@@ -57,6 +57,17 @@ def format_recommendations(recommended_products):
         lines.append(f"{index}. {product}")
 
     return "\n".join(lines)
+
+
+def get_dummy_recommendations(distributor_id):
+    demo_data = {
+        "D01": ["Beng Beng Wafer", "Malkist Cheese", "Product A", "Product B", "Product C"],
+        "D02": ["Malkist Cheese", "Product D", "Product E", "Product F", "Product G"],
+        "D03": ["Beng Beng Wafer", "Product H", "Product I", "Product J", "Product K"],
+        "D04": ["Product L", "Product M", "Product N", "Product O", "Product P"],
+        "D05": ["Product Q", "Product R", "Product S", "Product T", "Product U"],
+    }
+    return demo_data.get(distributor_id, ["No recommendations available"])
 
 
 def build_email_body(distributor_id, recommended_products_text):
@@ -80,6 +91,8 @@ Example:
 Product A - 100
 Product B - 250
 
+You may also fill in the attached Excel file and reply back to this email.
+
 Kindly ensure the details are accurate so that we can plan inventory and supply efficiently.
 
 Thank you for your cooperation.
@@ -100,21 +113,13 @@ if __name__ == "__main__":
     ]
 
     subject = "Demand Request for Upcoming Month"
+    attachment_path = os.path.join(os.getcwd(), ATTACHMENT_FILE)
 
     for distributor in distributors:
         distributor_id = distributor["id"]
         distributor_email = distributor["email"]
 
-        try:
-            recommended_products = get_recommended_products(
-                distributor_id,
-                graph_limit=5,
-                excel_limit=5
-            )
-        except Exception as e:
-            print(f"⚠ Could not fetch recommendations for {distributor_id}: {e}")
-            recommended_products = []
-
+        recommended_products = get_dummy_recommendations(distributor_id)
         recommended_products_text = format_recommendations(recommended_products)
         body = build_email_body(distributor_id, recommended_products_text)
 
@@ -123,7 +128,7 @@ if __name__ == "__main__":
                 to_email=distributor_email,
                 subject=subject,
                 body=body,
-                attachment_path=None
+                attachment_path=attachment_path
             )
         except Exception as e:
             print(f"❌ Failed to send email to {distributor_email}: {e}")

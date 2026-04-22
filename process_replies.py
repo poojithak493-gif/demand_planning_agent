@@ -1,47 +1,51 @@
-import os
-from read_replies import read_unseen_emails
-from parse_text_reply import parse_text_demand
-from parse_excel_reply import parse_excel_demand
+from read_replies import read_distributor_replies
+from parse_replies import parse_reply_body
 from save_to_postgres import create_table, save_demand
 
 
 def process_email_replies():
+    # Step 1: Ensure DB table exists
     create_table()
 
-    emails = read_unseen_emails()
+    # Step 2: Read distributor replies
+    emails = read_distributor_replies()
 
+    if not emails:
+        print("No distributor replies to process.")
+        return
+
+    # Step 3: Process each email
     for mail in emails:
+        distributor_id = mail["distributor_id"]
         distributor_email = mail["from_email"]
         body = mail["body"]
-        attachments = mail["attachments"]
 
-        # Parse text body
-        if body:
-            parsed_text = parse_text_demand(body)
-            for row in parsed_text:
-                save_demand(
-                    distributor_email=distributor_email,
-                    product_name=row["product_name"],
-                    quantity=row["quantity"]
-                )
-                print(f"Saved text reply data: {row}")
+        print(f"\nProcessing email from {distributor_email} ({distributor_id})")
 
-        # Parse Excel attachments
-        for file_path in attachments:
-            if file_path.lower().endswith(".xlsx"):
-                df = parse_excel_demand(file_path)
+        # Step 4: Parse text body
+        parsed_result = parse_reply_body(body)
 
-                for _, row in df.iterrows():
-                    product_name = str(row.get("Product_Name", "")).strip()
-                    quantity = row.get("Expected_Demand", None)
+        parsed_items = parsed_result["parsed_items"]
+        unparsed_lines = parsed_result["unparsed_lines"]
 
-                    if product_name and quantity is not None:
-                        save_demand(
-                            distributor_email=distributor_email,
-                            product_name=product_name,
-                            quantity=int(quantity)
-                        )
-                        print(f"Saved Excel reply data: {product_name} - {quantity}")
+        # Step 5: Save parsed items to DB
+        for item in parsed_items:
+            product_name = item["product_name"]
+            quantity = item["quantity"]
+
+            save_demand(
+                distributor_email=distributor_email,
+                product_name=product_name,
+                quantity=quantity
+            )
+
+            print(f"✅ Saved: {product_name} - {quantity}")
+
+        # Step 6: Show unparsed lines (for debugging)
+        if unparsed_lines:
+            print("⚠ Unparsed lines:")
+            for line in unparsed_lines:
+                print(f"- {line}")
 
 
 if __name__ == "__main__":
