@@ -1,19 +1,22 @@
+import json
 import os
+from typing import Dict, Any
+
 import psycopg2
-import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
 
-POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-POSTGRES_DB = os.getenv("POSTGRES_DB")
-POSTGRES_USER = os.getenv("POSTGRES_USER")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-
-RECOMMENDATION_FILE = r"sample_data\30_Recommended_New_Products.xlsx"
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", 5432))
+POSTGRES_DB = os.getenv("POSTGRES_DB", "postgres")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
 
 
+# =========================
+# DB CONNECTION
+# =========================
 def get_connection():
     return psycopg2.connect(
         host=POSTGRES_HOST,
@@ -24,166 +27,136 @@ def get_connection():
     )
 
 
-def create_tables():
+# =========================
+# TABLE CREATION
+# =========================
+def create_tables_if_not_exist():
+    create_replies_table = """
+    CREATE TABLE IF NOT EXISTS parsed_replies (
+        id SERIAL PRIMARY KEY,
+        message_id VARCHAR(255),
+        from_email VARCHAR(255),
+        subject TEXT,
+        distributor_id VARCHAR(50),
+        reply_type VARCHAR(50),
+        confidence NUMERIC(5,2),
+        notes TEXT,
+        needs_followup BOOLEAN,
+        raw_body TEXT,
+        cleaned_body TEXT,
+        parsed_json JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+
+    create_items_table = """
+    CREATE TABLE IF NOT EXISTS parsed_reply_items (
+        id SERIAL PRIMARY KEY,
+        parsed_reply_id INTEGER REFERENCES parsed_replies(id) ON DELETE CASCADE,
+        sku_id VARCHAR(100),
+        sku_name TEXT,
+        quantity INTEGER,
+        unit VARCHAR(50),
+        matched_text TEXT,
+        match_score INTEGER,
+        source TEXT,
+        sheet_name TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+
     conn = get_connection()
-    cursor = conn.cursor()
+    cur = conn.cursor()
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS distributor_demand (
-            id SERIAL PRIMARY KEY,
-            distributor_email TEXT,
-            product_name TEXT,
-            quantity INTEGER
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS distributor_replies (
-            id SERIAL PRIMARY KEY,
-            distributor_id TEXT,
-            distributor_email TEXT,
-            subject TEXT,
-            raw_body TEXT,
-            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS recommended_products (
-            id SERIAL PRIMARY KEY,
-            distributor_id TEXT,
-            product_name TEXT,
-            priority_rank INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+    cur.execute(create_replies_table)
+    cur.execute(create_items_table)
 
     conn.commit()
-    cursor.close()
+    cur.close()
     conn.close()
 
 
-def save_demand(distributor_email, product_name, quantity):
+# =========================
+# SAVE FUNCTION
+# =========================
+def save_parsed_reply(raw_email: Dict[str, Any], parsed_data: Dict[str, Any]):
+    create_tables_if_not_exist()
+
     conn = get_connection()
-    cursor = conn.cursor()
+    cur = conn.cursor()
 
-    cursor.execute("""
-        INSERT INTO distributor_demand (distributor_email, product_name, quantity)
-        VALUES (%s, %s, %s)
-    """, (distributor_email, product_name, quantity))
+    # ---------- Insert main reply ----------
+    insert_reply_sql = """
+    INSERT INTO parsed_replies (
+        message_id,
+        from_email,
+        subject,
+        distributor_id,
+        reply_type,
+        confidence,
+        notes,
+        needs_followup,
+        raw_body,
+        cleaned_body,
+        parsed_json
+    )
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    RETURNING id;
+    """
 
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-
-def save_raw_reply(distributor_id, distributor_email, subject, raw_body):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        INSERT INTO distributor_replies (distributor_id, distributor_email, subject, raw_body)
-        VALUES (%s, %s, %s, %s)
-    """, (distributor_id, distributor_email, subject, raw_body))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-
-def load_recommendations_from_excel():
-    df = pd.read_excel(
-        RECOMMENDATION_FILE,
-        sheet_name="3. Recommendation Mapping",
-        header=2
+    cur.execute(
+        insert_reply_sql,
+        (
+            raw_email.get("message_id"),
+            raw_email.get("from_email"),
+            raw_email.get("subject"),
+            parsed_data.get("distributor_id"),
+            parsed_data.get("reply_type"),
+            parsed_data.get("confidence"),
+            parsed_data.get("notes"),
+            parsed_data.get("needs_followup"),
+            parsed_data.get("raw_body"),
+            parsed_data.get("cleaned_body"),
+            json.dumps(parsed_data),
+        )
     )
 
-    print("Excel loaded successfully.")
-    print("Columns found:", df.columns.tolist())
+    parsed_reply_id = cur.fetchone()[0]
 
-    return df
+    # ---------- Insert items ----------
+    insert_item_sql = """
+    INSERT INTO parsed_reply_items (
+        parsed_reply_id,
+        sku_id,
+        sku_name,
+        quantity,
+        unit,
+        matched_text,
+        match_score,
+        source,
+        sheet_name
+    )
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+    """
 
-
-def normalize_recommendation_columns(df):
-    df = df.rename(columns={
-        "Distributor": "distributor_raw",
-        "#": "priority_rank",
-        "Recommended SKU": "product_name",
-        "Recommendation Reason": "recommendation_reason"
-    })
-
-    required_columns = ["distributor_raw", "priority_rank", "product_name"]
-    missing_columns = [col for col in required_columns if col not in df.columns]
-
-    if missing_columns:
-        raise ValueError(f"Missing required columns in Excel: {missing_columns}")
-
-    df = df[required_columns].copy()
-
-    df["distributor_raw"] = df["distributor_raw"].ffill()
-    df["distributor_id"] = df["distributor_raw"].astype(str).str.extract(r"(D\d+)", expand=False)
-    df["product_name"] = df["product_name"].astype(str).str.strip()
-    df["priority_rank"] = pd.to_numeric(df["priority_rank"], errors="coerce")
-
-    df = df.dropna(subset=["distributor_id", "product_name", "priority_rank"])
-    df["priority_rank"] = df["priority_rank"].astype(int)
-
-    df = df[["distributor_id", "product_name", "priority_rank"]]
-
-    return df
-
-
-def insert_recommendations(df):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM recommended_products")
-
-    for _, row in df.iterrows():
-        cursor.execute("""
-            INSERT INTO recommended_products (distributor_id, product_name, priority_rank)
-            VALUES (%s, %s, %s)
-        """, (
-            row["distributor_id"],
-            row["product_name"],
-            row["priority_rank"]
-        ))
+    for item in parsed_data.get("items", []):
+        cur.execute(
+            insert_item_sql,
+            (
+                parsed_reply_id,
+                item.get("sku_id"),
+                item.get("sku_name"),
+                item.get("quantity"),
+                item.get("unit"),
+                item.get("matched_text"),
+                item.get("match_score"),
+                item.get("source", "email_body"),   # default source
+                item.get("sheet_name"),             # None if not Excel
+            )
+        )
 
     conn.commit()
-    cursor.close()
+    cur.close()
     conn.close()
 
-
-def verify_recommendations(distributor_id="D04"):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT distributor_id, product_name, priority_rank
-        FROM recommended_products
-        WHERE distributor_id = %s
-        ORDER BY priority_rank ASC
-    """, (distributor_id,))
-
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-
-    print(f"\nRecommendations for {distributor_id}:")
-    if rows:
-        for row in rows:
-            print(row)
-    else:
-        print("No recommendations found.")
-
-
-if __name__ == "__main__":
-    create_tables()
-
-    df = load_recommendations_from_excel()
-    df = normalize_recommendation_columns(df)
-    insert_recommendations(df)
-    verify_recommendations("D04")
-
-    print("\nData saved to PostgreSQL successfully.")
+    print(f"Saved parsed reply successfully → ID: {parsed_reply_id}")

@@ -12,6 +12,9 @@ EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
 
+# Excel attachment path
+DEMAND_ATTACHMENT_PATH = r"C:\Users\rishi\OneDrive\Documents\GitHub\demand_planning_agent\DEMAND.xlsx"
+
 
 def send_email(to_email, subject, body, attachment_path=None):
     if not EMAIL_ADDRESS:
@@ -34,10 +37,11 @@ def send_email(to_email, subject, body, attachment_path=None):
             file_data = f.read()
             file_name = os.path.basename(attachment_path)
 
+        # Proper MIME type for .xlsx
         msg.add_attachment(
             file_data,
             maintype="application",
-            subtype="octet-stream",
+            subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             filename=file_name
         )
 
@@ -60,8 +64,7 @@ def format_recommendations(recommended_products):
 
 
 def build_email_body(distributor_id, recommended_products_text):
-    return f"""
-Dear Distributor,
+    return f"""Dear Distributor,
 
 Greetings from Lipton Enterprises.
 
@@ -72,13 +75,16 @@ Your Distributor ID: {distributor_id}
 Best Recommended Products:
 {recommended_products_text}
 
-Please provide the expected demand for the next month in the following format:
+Please provide the expected demand for the next month in any one of the following ways:
 
+1. Reply directly in email text format:
 Product Name - Quantity
 
 Example:
 Product A - 100
 Product B - 250
+
+2. Or fill in the attached Excel file and send it back as a reply.
 
 Kindly ensure the details are accurate so that we can plan inventory and supply efficiently.
 
@@ -100,6 +106,10 @@ if __name__ == "__main__":
     ]
 
     subject = "Demand Request for Upcoming Month"
+
+    # Check attachment once before sending all emails
+    if not os.path.exists(DEMAND_ATTACHMENT_PATH):
+        raise FileNotFoundError(f"DEMAND.xlsx file not found at: {DEMAND_ATTACHMENT_PATH}")
 
     for distributor in distributors:
         distributor_id = distributor["id"]
@@ -123,7 +133,7 @@ if __name__ == "__main__":
                 to_email=distributor_email,
                 subject=subject,
                 body=body,
-                attachment_path=None
+                attachment_path=DEMAND_ATTACHMENT_PATH
             )
         except Exception as e:
             print(f"❌ Failed to send email to {distributor_email}: {e}")

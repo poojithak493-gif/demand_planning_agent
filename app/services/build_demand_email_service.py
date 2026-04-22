@@ -1,57 +1,62 @@
-class BuildDemandEmailService:
-    
-    def execute(self, distributor_context: dict, recommendations: list):
+from typing import List
 
-        distributor_id = distributor_context["distributor_id"]
-        distributor_name = distributor_context.get("distributor_name", distributor_id)
+from app.data.sku_data import get_sku_id_to_name
 
-        month = "May 2026"
 
-        subject = f"Demand Confirmation Request – {distributor_id} – {month}"
+def get_recommended_products(limit: int = 5) -> List[str]:
+    """
+    Returns real product names from the loaded SKU master.
+    Make sure load_sku_data(...) is called before using this.
+    """
+    sku_id_to_name = get_sku_id_to_name()
 
-        table_lines = []
-        table_lines.append("Recommended products — " + month)
-        table_lines.append("────────────────────────────────────────────────────────────────────────────")
-        table_lines.append("  Product Name                                 Reason")
-        table_lines.append("────────────────────────────────────────────────────────────────────────────")
+    if not sku_id_to_name:
+        return []
 
-        for item in recommendations:
-            product_name = item.get("product", "")
-            reason = item.get("reason", "")
+    product_names = list(sku_id_to_name.values())
+    return product_names[:limit]
 
-            row = f"  {product_name[:40]:40}  {reason[:30]}"
-            table_lines.append(row)
 
-        table_lines.append("────────────────────────────────────────────────────────────────────────────")
+def build_demand_email(distributor_id: str, distributor_email: str) -> dict:
+    recommended_products = get_recommended_products(limit=5)
 
-        table_block = "\n".join(table_lines)
+    if recommended_products:
+        recommended_block = "\n".join(
+            f"{index}. {product}"
+            for index, product in enumerate(recommended_products, start=1)
+        )
+    else:
+        recommended_block = "1. No products available"
 
-        body = f"""
-To: Distributor {distributor_id} — {distributor_name}
+    subject = "Demand Request for Upcoming Month"
 
-Dear Partner,
+    body = f"""Dear Distributor,
 
-Please review the following recommended new products for the coming month ({month}).
+Greetings from Lipton Enterprises.
 
-These recommendations are shared based on distributor fit, product category relevance, and channel suitability.
-Kindly reply with the products you are interested in and the required quantities.
+We are planning for the upcoming month and request you to share your expected product demand.
 
-You may reply directly to this email in the format:
+Your Distributor ID: {distributor_id}
+
+Best Recommended Products:
+{recommended_block}
+
+Please provide the expected demand for the next month in the following format:
+
 Product Name - Quantity
 
 Example:
-MALKIST CHEESE DISPLAY BOX - 20
-MALKIST CHEESE MULTIPACK - 15
+Product A - 100
+Product B - 250
 
-{table_block}
+You may also fill in the attached Excel file and reply back to this email.
 
-Please confirm or share your required quantities.
-
-Warm regards,
-Demand Planning Team
+Regards,
+Lipton Enterprises
 """
 
-        return {
-            "subject": subject,
-            "body": body.strip()
-        }
+    return {
+        "to_email": distributor_email,
+        "subject": subject,
+        "body": body
+    }
