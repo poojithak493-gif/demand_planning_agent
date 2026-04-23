@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+
     # =========================
     # App Info
     # =========================
@@ -25,22 +26,30 @@ class Settings(BaseSettings):
     FALKOR_GRAPH: str
 
     # =========================
-    # Postal (OLD - keep it)
+    # Gmail SMTP (sending emails)
     # =========================
-    POSTAL_BASE_URL: str
-    POSTAL_SERVER_KEY: str
-    POSTAL_FROM_EMAIL: str
-    POSTAL_WEBHOOK_URL: str
+    EMAIL_ADDRESS: str        # e.g. bejagamrevan@gmail.com
+    EMAIL_APP_PASSWORD: str   # Gmail App Password (not account password)
+    SMTP_SERVER: str = "smtp.gmail.com"
+    SMTP_PORT: int = 465
 
     # =========================
-    # Postal SMTP (NEW - ADD THIS)
+    # Gmail IMAP (reading replies)
     # =========================
-    POSTAL_SMTP_HOST: str
-    POSTAL_SMTP_PORT: int
-    POSTAL_SMTP_USER: str
-    POSTAL_SMTP_PASS: str
+    IMAP_SERVER: str = "imap.gmail.com"
+    IMAP_PORT: int = 993
 
-    model_config = SettingsConfigDict(env_file=".env")
+    # =========================
+    # RedPanda
+    # =========================
+    REDPANDA_BROKER: str = "localhost:9092"
+
+    # =========================
+    # Temporal
+    # =========================
+    TEMPORAL_HOST: str = "localhost:7233"
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()
