@@ -1,5 +1,6 @@
 services:
 
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
     container_name: demand_postgres
@@ -18,6 +19,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── FalkorDB (Graph DB) ──────────────────────────────────────────────────────
   falkordb:
     image: falkordb/falkordb:latest
     container_name: demand_falkordb
@@ -33,6 +35,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── RedPanda (Event Bus) ─────────────────────────────────────────────────────
   redpanda:
     image: redpandadata/redpanda:latest
     container_name: demand_redpanda
@@ -82,6 +85,50 @@ services:
     depends_on:
       - redpanda
 
+  # ── Temporal (Durable Workflow Engine) ───────────────────────────────────────
+  # Uses PostgreSQL as its backend store — no separate DB needed.
+  # auto-setup image creates all Temporal internal tables on first boot.
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: demand_temporal
+    restart: unless-stopped
+    environment:
+      # Tell Temporal to use PostgreSQL (not default Cassandra)
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      # Temporal creates its own databases inside your postgres container:
+      #   temporal          — workflow state
+      #   temporal_visibility — search/list workflows
+      - POSTGRES_SEEDS=postgres
+      
+    ports:
+      - "7233:7233"       # gRPC — your FastAPI + worker connect here
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s   # Temporal needs ~20s to run migrations on first boot
+
+  # Temporal Web UI — view running workflows, signals, history at localhost:8088
+  temporal_ui:
+    image: temporalio/ui:2.26.2
+    container_name: demand_temporal_ui
+    restart: unless-stopped
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:8088
+    ports:
+      - "8088:8080"
+    depends_on:
+      - temporal
+
+  # ── FastAPI ──────────────────────────────────────────────────────────────────
   fastapi:
     build:
       context: .
@@ -90,9 +137,20 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/demand_planning
+      # psycopg2 direct connection (used by get_connection())
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432           # inside docker network use 5432, not 5433
+      POSTGRES_DB: demand_planning
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # FalkorDB
       FALKORDB_HOST: falkordb
       FALKORDB_PORT: 6379
+      # RedPanda — use internal port 29092 inside docker network
+      REDPANDA_BROKER: redpanda:29092
       REDPANDA_BROKERS: redpanda:29092
+      # Temporal
+      TEMPORAL_HOST: temporal:7233
     ports:
       - "8000:8000"
     volumes:
@@ -104,11 +162,45 @@ services:
         condition: service_healthy
       redpanda:
         condition: service_started
+      temporal:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
       timeout: 5s
       retries: 5
+
+  # ── Temporal Worker ──────────────────────────────────────────────────────────
+  # Runs separately from FastAPI. Registers the DemandPlanningWorkflow
+  # and all activities. Listens on task queue "demand-planning-queue".
+  temporal_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: demand_temporal_worker
+    restart: unless-stopped
+    # Override the default CMD to run the worker instead of uvicorn
+    command: ["python", "-m", "app.temporal.worker"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/demand_planning
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: demand_planning
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: 6379
+      REDPANDA_BROKER: redpanda:29092
+      TEMPORAL_HOST: temporal:7233
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      fastapi:
+        condition: service_healthy   # worker calls FastAPI activities via HTTP
 
 volumes:
   postgres_data:
