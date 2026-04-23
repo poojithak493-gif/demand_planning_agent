@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 from pydantic import BaseModel, Field, model_validator
 
@@ -51,6 +52,14 @@ class RecommendationEmailPayloadResponse(BaseModel):
     recommended_skus: List[SKURecommendationItem]
 
 
+class EmailDispatchResponse(BaseModel):
+    distributor_code: str
+    recipient_email: str
+    email_subject: str
+    sent: bool
+    attachment_path: str | None = None
+
+
 class ParsedReplyItem(BaseModel):
     sku_code: str = Field(..., min_length=1)
     monthly_quantity: int = Field(..., ge=0)
@@ -86,6 +95,11 @@ class ReplyValidationIssue(BaseModel):
 
 class ProcessReplyRequest(BaseModel):
     email_body: str = Field(..., min_length=1)
+    from_email: str | None = None
+    subject: str | None = None
+    confirmed_by: str | None = None
+    notes: str | None = None
+    received_at: datetime | None = None
 
 
 class WeeklyPlanItem(BaseModel):

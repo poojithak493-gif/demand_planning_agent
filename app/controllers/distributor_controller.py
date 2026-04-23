@@ -3,6 +3,7 @@ from app.schemas.demand_schema import CombinedDemandCycleResponse, ProcessReplyR
 from app.schemas.distributor_schema import (
     DistributorContextResponse,
     DemandPlanResponse,
+    EmailDispatchResponse,
     ParsedReplyRequest,
     ProcessReplyRequest,
     ReplyProcessingResponse,
@@ -59,6 +60,17 @@ def get_email_payload(distributor_code: str):
 
 
 @router.post(
+    "/{distributor_code}/send-demand-email",
+    response_model=EmailDispatchResponse,
+)
+def send_demand_email(distributor_code: str):
+    try:
+        return demand_cycle_service.send_demand_email(distributor_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post(
     "/{distributor_code}/process-reply",
     response_model=ProcessReplyResponse,
 )
@@ -67,6 +79,11 @@ def process_reply(distributor_code: str, request: ProcessReplyRequest):
         return demand_cycle_service.process_reply(
             distributor_code=distributor_code,
             email_body=request.email_body,
+            from_email=request.from_email,
+            subject=request.subject,
+            confirmed_by=request.confirmed_by,
+            notes=request.notes,
+            received_at=request.received_at.isoformat() if request.received_at else None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -115,12 +132,3 @@ def process_demand_cycle(distributor_code: str, reply_request: ParsedReplyReques
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-@router.get(
-    "/{distributor_code}/demand-cycle",
-    response_model=CombinedDemandCycleResponse,
-)
-def get_demand_cycle(distributor_code: str):
-    try:
-        return demand_cycle_service.run_mocked_demand_cycle(distributor_code)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))

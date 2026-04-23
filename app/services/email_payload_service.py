@@ -1,5 +1,6 @@
 from app.services.demand_plan_service import DemandPlanService
 from app.services.helpers.build_demand_email_service import BuildDemandEmailService
+from app.services.helpers.send_mail import send_email
 
 
 class EmailPayloadService:
@@ -22,14 +23,36 @@ class EmailPayloadService:
         return {
             "distributor_code": distributor["distributor_code"],
             "distributor_name": distributor["name"],
+            "recipient_email": distributor["email"],
             "email_subject": email_subject,
             "email_body": email_body,
             "recommended_skus": recommended_skus,
         }
 
+    def send_email_payload(
+        self,
+        distributor_code: str,
+        attachment_path: str | None = None,
+    ) -> dict:
+        email_payload = self.build_email_payload(distributor_code)
+        send_result = send_email(
+            to_email=email_payload["recipient_email"],
+            subject=email_payload["email_subject"],
+            body=email_payload["email_body"],
+            attachment_path=attachment_path,
+        )
+
+        return {
+            "distributor_code": distributor_code,
+            "recipient_email": email_payload["recipient_email"],
+            "email_subject": email_payload["email_subject"],
+            "sent": send_result["sent"],
+            "attachment_path": attachment_path,
+        }
+
     def _build_helper_payload(self, distributor: dict, recommended_skus: list[dict]) -> dict:
         distributor_context = {
-            "distributor_id": distributor["distributor_id"],
+            "distributor_code": distributor["distributor_code"],
             "sku_demand_signals": distributor.get("sku_demand_signals", []),
         }
         recommendation_response = {

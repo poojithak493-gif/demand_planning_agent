@@ -22,6 +22,15 @@ class DistributorService:
 
         return distributor
 
+    def get_distributor_by_email(self, email: str) -> dict:
+        distributor = self.distributor_repository.get_by_email(email)
+
+        if not distributor:
+            raise ValueError(f"Distributor with email '{email}' not found")
+
+        distributor["distributor_id"] = str(distributor["distributor_id"])
+        return distributor
+
     def _fetch_enrichment(self, distributor_id: str) -> dict:
         with SessionLocal() as session:
             fetch_service = FetchDistributorContextService(session)

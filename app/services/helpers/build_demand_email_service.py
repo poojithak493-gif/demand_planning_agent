@@ -1,12 +1,12 @@
 class BuildDemandEmailService:
     def execute(self, distributor_context: dict, recommendation_response: dict) -> dict:
-        distributor_id = distributor_context["distributor_id"]
+        distributor_code = distributor_context["distributor_code"]
         recommendations = recommendation_response["recommendations"]
 
-        subject = f"Demand Planning Request for Distributor {distributor_id}"
+        subject = f"Demand Planning Request for Distributor {distributor_code}"
 
         lines = [
-            f"Dear Distributor {distributor_id},",
+            f"Dear Distributor {distributor_code},",
             "",
             "Please confirm your expected demand for the next 30 days.",
             "Based on your purchase graph, we suggest the following SKUs:",
@@ -14,13 +14,13 @@ class BuildDemandEmailService:
         ]
 
         for item in recommendations:
-            lines.append(f"{item['sku_id']} - {item['sku_name']}")
+            lines.append(f"{item['sku_code']} - {item['sku_name']}")
 
         lines.extend([
             "",
             "Please reply in this format:",
-            "SKU001 - 100",
-            "SKU002 - 250",
+            "SKU11 - 100",
+            "SKU12 - 200",
             "",
             "Regards,",
             "Demand Planning Team"

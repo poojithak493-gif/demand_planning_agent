@@ -51,11 +51,18 @@ class SavedStatusResponse(BaseModel):
     cycle_id: str | None = None
 
 
+class MailResponseStatusResponse(BaseModel):
+    mail_response_id: int | None = None
+    processing_status: str
+    parse_status: str
+
+
 class ProcessReplyResponse(BaseModel):
     parsed_reply: ParsedReplyResponse
     validation_result: ValidationResultResponse
     weekly_demand_plan: WeeklyDemandPlanResponse
     saved_status: SavedStatusResponse
+    mail_response_status: MailResponseStatusResponse
 
 
 class CombinedDemandCycleResponse(BaseModel):

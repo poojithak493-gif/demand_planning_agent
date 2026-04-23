@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import text
 
 from app.core.database import SessionLocal
@@ -165,6 +167,107 @@ class DemandPersistenceService:
             "saved": True,
             "inserted_rows": inserted_rows,
             "cycle_id": str(cycle["cycle_id"]),
+        }
+
+    def record_inbound_mail_response(
+        self,
+        distributor_code: str | None,
+        from_email: str | None,
+        subject: str | None,
+        raw_body: str,
+        received_at: str | None = None,
+        processing_status: str = "received",
+        parse_status: str = "pending",
+        notes: str | None = None,
+    ) -> dict:
+        distributor = (
+            self.distributor_repository.get_by_code(distributor_code)
+            if distributor_code
+            else None
+        )
+        received_timestamp = received_at or datetime.now(timezone.utc).isoformat()
+        insert_query = text("""
+            INSERT INTO inbound_mail_responses (
+                distributor_id,
+                distributor_code,
+                from_email,
+                subject,
+                raw_body,
+                received_at,
+                processing_status,
+                parse_status,
+                notes
+            )
+            VALUES (
+                :distributor_id,
+                :distributor_code,
+                :from_email,
+                :subject,
+                :raw_body,
+                :received_at,
+                :processing_status,
+                :parse_status,
+                :notes
+            )
+            RETURNING id
+        """)
+
+        with SessionLocal() as session:
+            response_id = session.execute(
+                insert_query,
+                {
+                    "distributor_id": str(distributor["distributor_id"]) if distributor else None,
+                    "distributor_code": distributor_code,
+                    "from_email": from_email,
+                    "subject": subject,
+                    "raw_body": raw_body,
+                    "received_at": received_timestamp,
+                    "processing_status": processing_status,
+                    "parse_status": parse_status,
+                    "notes": notes,
+                },
+            ).scalar_one()
+            session.commit()
+
+        return {
+            "mail_response_id": int(response_id),
+            "processing_status": processing_status,
+            "parse_status": parse_status,
+        }
+
+    def update_inbound_mail_response(
+        self,
+        mail_response_id: int,
+        processing_status: str,
+        parse_status: str,
+        notes: str | None = None,
+    ) -> dict:
+        update_query = text("""
+            UPDATE inbound_mail_responses
+            SET
+                processing_status = :processing_status,
+                parse_status = :parse_status,
+                notes = :notes,
+                updated_at = NOW()
+            WHERE id = :response_id
+        """)
+
+        with SessionLocal() as session:
+            session.execute(
+                update_query,
+                {
+                    "response_id": mail_response_id,
+                    "processing_status": processing_status,
+                    "parse_status": parse_status,
+                    "notes": notes,
+                },
+            )
+            session.commit()
+
+        return {
+            "mail_response_id": mail_response_id,
+            "processing_status": processing_status,
+            "parse_status": parse_status,
         }
 
     def _get_latest_cycle(self) -> dict | None:

@@ -27,3 +27,28 @@ class DistributorRepository:
             ).mappings().first()
 
             return dict(row) if row else None
+
+    def get_by_email(self, email: str) -> dict | None:
+        query = text("""
+            SELECT
+                distributor_id,
+                distributor_code,
+                name,
+                email,
+                phone,
+                region,
+                priority,
+                is_active
+            FROM distributors
+            WHERE LOWER(email) = LOWER(:email)
+              AND is_active = TRUE
+            LIMIT 1
+        """)
+
+        with SessionLocal() as session:
+            row = session.execute(
+                query,
+                {"email": email},
+            ).mappings().first()
+
+            return dict(row) if row else None

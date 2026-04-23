@@ -1,6 +1,7 @@
 from app.repositories.sku_repository import SKURepository
 from app.services.distributor_service import DistributorService
 from app.services.helpers.load_new_products_service import LoadNewProductsService
+from app.services.helpers.load_skus_from_csv import LoadSKUsFromCSVService
 from app.services.helpers.sku_recommendation_service import SKURecommendationService
 
 
@@ -10,8 +11,10 @@ class RecommendationService:
         self.sku_repository = SKURepository()
         self.graph_recommendation_service = SKURecommendationService()
         self.new_products_service = LoadNewProductsService()
+        self.sku_csv_loader = LoadSKUsFromCSVService()
 
     def get_sku_recommendations(self, distributor_code: str) -> dict:
+        self._ensure_new_skus_loaded()
         distributor = self.distributor_service.get_distributor_context(distributor_code)
         distributor_id = str(distributor["distributor_id"])
         profile_rows = self.sku_repository.get_distributor_recommendation_profile(
@@ -416,3 +419,10 @@ class RecommendationService:
         if existing_source == "graph_similar" or new_source == "graph_similar":
             return "graph_similar"
         return new_source or existing_source or "proven"
+
+    def _ensure_new_skus_loaded(self) -> None:
+        try:
+            self.sku_csv_loader.execute()
+        except Exception:
+            # Keep recommendation flow resilient if CSV sync is unavailable.
+            pass
