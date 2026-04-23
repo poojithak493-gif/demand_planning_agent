@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import smtplib
 from email.message import EmailMessage
@@ -32,19 +33,7 @@ def send_email(
     msg.set_content(body)
 
     if attachment_path:
-        if not os.path.exists(attachment_path):
-            raise FileNotFoundError(f"Attachment file not found: {attachment_path}")
-
-        with open(attachment_path, "rb") as attachment_file:
-            file_data = attachment_file.read()
-            file_name = os.path.basename(attachment_path)
-
-        msg.add_attachment(
-            file_data,
-            maintype="application",
-            subtype="octet-stream",
-            filename=file_name,
-        )
+        _add_attachment(msg, attachment_path)
 
     with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as smtp:
         smtp.login(EMAIL_ADDRESS, EMAIL_APP_PASSWORD)
@@ -58,21 +47,44 @@ def send_email(
     }
 
 
-if __name__ == "__main__":
-    # Test-only SMTP smoke path. This is not part of the FastAPI runtime flow.
-    target_email = os.getenv("TEST_TO_EMAIL")
-    test_subject = os.getenv("TEST_EMAIL_SUBJECT", "Demand Planning SMTP Test")
-    test_body = os.getenv("TEST_EMAIL_BODY", "This is a test email from demand_planning_agent.")
-    test_attachment = os.getenv("TEST_ATTACHMENT_PATH")
+def _add_attachment(message: EmailMessage, attachment_path: str) -> None:
+    if not os.path.exists(attachment_path):
+        raise FileNotFoundError(f"Attachment file not found: {attachment_path}")
 
-    if not target_email:
-        raise ValueError("TEST_TO_EMAIL must be set for the send_mail.py smoke test")
+    with open(attachment_path, "rb") as attachment_file:
+        file_data = attachment_file.read()
 
-    print(
-        send_email(
-            to_email=target_email,
-            subject=test_subject,
-            body=test_body,
-            attachment_path=test_attachment,
-        )
+    mime_type, _ = mimetypes.guess_type(attachment_path)
+    if mime_type:
+        maintype, subtype = mime_type.split("/", maxsplit=1)
+    else:
+        maintype, subtype = "application", "octet-stream"
+
+    message.add_attachment(
+        file_data,
+        maintype=maintype,
+        subtype=subtype,
+        filename=os.path.basename(attachment_path),
     )
+
+
+if __name__ == "__main__":
+    # Manual smoke test only. This block is not part of the application flow.
+    manual_recipient = os.getenv("MANUAL_TEST_RECIPIENT")
+    manual_subject = os.getenv("MANUAL_TEST_SUBJECT", "Manual SMTP Test")
+    manual_body = os.getenv(
+        "MANUAL_TEST_BODY",
+        "This is a manual SMTP connectivity test from demand_planning_agent.",
+    )
+    manual_attachment = os.getenv("MANUAL_TEST_ATTACHMENT")
+
+    if not manual_recipient:
+        raise ValueError("Set MANUAL_TEST_RECIPIENT to run the manual SMTP test")
+
+    result = send_email(
+        to_email=manual_recipient,
+        subject=manual_subject,
+        body=manual_body,
+        attachment_path=manual_attachment,
+    )
+    print(result)

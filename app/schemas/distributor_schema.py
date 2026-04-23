@@ -47,6 +47,7 @@ class EmailRecommendationItem(BaseModel):
 class RecommendationEmailPayloadResponse(BaseModel):
     distributor_code: str
     distributor_name: str
+    recipient_email: str
     email_subject: str
     email_body: str
     recommended_skus: List[SKURecommendationItem]

@@ -16,9 +16,12 @@ class EmailPayloadService:
         helper_payload = self._build_helper_payload(distributor, recommended_skus)
         email_subject = helper_payload.get(
             "subject",
-            f"Demand Plan Recommendation for {distributor['distributor_code']}",
+            self._build_subject(distributor),
         )
-        email_body = helper_payload.get("body", self._build_default_body(distributor, recommended_skus))
+        email_body = helper_payload.get(
+            "body",
+            self._build_body(distributor, recommended_skus),
+        )
 
         return {
             "distributor_code": distributor["distributor_code"],
@@ -68,21 +71,40 @@ class EmailPayloadService:
             return {}
 
     @staticmethod
-    def _build_default_body(distributor: dict, recommended_skus: list[dict]) -> str:
+    def _build_subject(distributor: dict) -> str:
+        return (
+            f"Demand Planning Request for {distributor['name']} "
+            f"({distributor['distributor_code']})"
+        )
+
+    @staticmethod
+    def _build_body(distributor: dict, recommended_skus: list[dict]) -> str:
         body_lines = [
             f"Hello {distributor['name']},",
             "",
             "Please review the recommended SKUs below for the upcoming demand plan.",
+            f"Distributor code: {distributor['distributor_code']}",
             "",
         ]
 
-        for sku in recommended_skus:
-            body_lines.append(
-                f"- {sku['sku_code']} ({sku['sku_name']}): score {sku['score']}"
-            )
+        if recommended_skus:
+            for index, sku in enumerate(recommended_skus, start=1):
+                body_lines.append(
+                    f"{index}. {sku['sku_code']} - {sku['sku_name']} "
+                    f"(score: {sku['score']})"
+                )
+                if sku.get("reason"):
+                    body_lines.append(f"   Reason: {sku['reason']}")
+        else:
+            body_lines.append("No SKU recommendations are available for this cycle.")
 
         body_lines.extend([
             "",
-            "Please reply with your confirmed monthly quantities for each SKU.",
+            "Please reply with your confirmed monthly quantities for each SKU in this format:",
+            "SKU11 - 100",
+            "SKU12 - 200",
+            "",
+            "Regards,",
+            "Demand Planning Team",
         ])
         return "\n".join(body_lines)
