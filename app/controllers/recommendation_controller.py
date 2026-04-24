@@ -1,27 +1,26 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from app.services.distributor_service import DistributorService
-from app.services.email_payload_service import EmailPayloadService
-from app.services.recommendation_service import RecommendationService
+from app.core.database import get_db
+from app.services.fetch_distributor_context_service import FetchDistributorContextService
+from app.services.sku_recommendation_service import SKURecommendationService
+from app.services.build_demand_email_service import BuildDemandEmailService
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 
-distributor_service = DistributorService()
-recommendation_service = RecommendationService()
-email_payload_service = EmailPayloadService()
-
 
 @router.get("/{distributor_id}")
-def get_recommendations(distributor_id: str):
-    context = distributor_service.get_distributor_context(distributor_id)
-    recommendations = recommendation_service.get_sku_recommendations(distributor_id)
-    email_payload = email_payload_service.build_email_payload(distributor_id)
+def get_recommendations(distributor_id: str, db: Session = Depends(get_db)):
+    context_service = FetchDistributorContextService(db)
+    recommendation_service = SKURecommendationService()
+    email_service = BuildDemandEmailService()
+
+    context = context_service.execute(distributor_id)
+    recommendations = recommendation_service.execute(distributor_id)
+    email_preview = email_service.execute(context, recommendations)
 
     return {
         "context": context,
-        "recommendations": recommendations.get("recommended_skus", []),
-        "email_preview": {
-            "subject": email_payload["email_subject"],
-            "body": email_payload["email_body"],
-        },
+        "recommendations": recommendations,
+        "email_preview": email_preview
     }
