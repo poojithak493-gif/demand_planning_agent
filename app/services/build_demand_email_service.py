@@ -1,20 +1,12 @@
 from typing import List
-
 from app.data.sku_data import get_sku_id_to_name
 
 
 def get_recommended_products(limit: int = 5) -> List[str]:
-    """
-    Returns real product names from the loaded SKU master.
-    Make sure load_sku_data(...) is called before using this.
-    """
     sku_id_to_name = get_sku_id_to_name()
-
     if not sku_id_to_name:
         return []
-
-    product_names = list(sku_id_to_name.values())
-    return product_names[:limit]
+    return list(sku_id_to_name.values())[:limit]
 
 
 def build_demand_email(distributor_id: str, distributor_email: str) -> dict:
@@ -22,8 +14,8 @@ def build_demand_email(distributor_id: str, distributor_email: str) -> dict:
 
     if recommended_products:
         recommended_block = "\n".join(
-            f"{index}. {product}"
-            for index, product in enumerate(recommended_products, start=1)
+            f"{i}. {product}"
+            for i, product in enumerate(recommended_products, start=1)
         )
     else:
         recommended_block = "1. No products available"

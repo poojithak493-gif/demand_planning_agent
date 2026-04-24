@@ -2,12 +2,9 @@ import asyncio
 from datetime import timedelta
 from temporalio import workflow
 
-# Tell Temporal's sandbox to allow these non-deterministic modules
-# httpx and other IO libraries cannot run inside the sandbox
 with workflow.unsafe.imports_passed_through():
     from app.temporal.activities import (
         fetch_context_activity,
-        send_email_activity,
         validate_reply_activity,
         write_confirmed_qty_activity,
         emit_demand_confirmed_activity,
@@ -24,15 +21,12 @@ class DemandPlanningWorkflow:
     async def run(self, distributor_id: str):
         opts = {"start_to_close_timeout": timedelta(seconds=30)}
 
-        # Part 1 — fetch context → send email
+        # Fetch context
         await workflow.execute_activity(
             fetch_context_activity, distributor_id, **opts
         )
-        await workflow.execute_activity(
-            send_email_activity, distributor_id, **opts
-        )
 
-        # Wait for reply signal — timeout = 7 days → escalate
+        # Wait for reply signal — timeout = 7 days
         try:
             await workflow.wait_condition(
                 lambda: self._reply_data is not None,
@@ -44,7 +38,7 @@ class DemandPlanningWorkflow:
             )
             return
 
-        # Part 2 — validate → write → emit
+        # Validate → write → emit
         reply_id = self._reply_data["parsed_reply_id"]
 
         validated = await workflow.execute_activity(
@@ -53,12 +47,13 @@ class DemandPlanningWorkflow:
 
         if validated.get("status") == "valid":
             await workflow.execute_activity(
-                write_confirmed_qty_activity, distributor_id, validated, **opts
+                write_confirmed_qty_activity,
+                args=[distributor_id, validated],
+                **opts,
             )
             await workflow.execute_activity(
                 emit_demand_confirmed_activity,
-                distributor_id,
-                validated.get("total_confirmed_qty", 0),
+                args=[distributor_id, validated.get("total_confirmed_qty", 0)],
                 **opts,
             )
         else:
@@ -69,8 +64,4 @@ class DemandPlanningWorkflow:
 
     @workflow.signal
     def reply_received(self, reply_data: dict):
-        """
-        Called by postal_webhook_controller after parsing completes.
-        Unblocks the wait_condition above.
-        """
         self._reply_data = reply_data

@@ -5,32 +5,29 @@ from app.core.config import settings
 from app.core.database import ensure_confirmed_demands_table
 from app.services.send_demand_email_service import send_email, send_bulk_emails
 
-# ── Routers ────────────────────────────────────────────────────────────────────
-from app.controllers.postal_webhook_controller import router as webhook_router
+# ── Routers ────────────────────────────────────────────────────────────────
 from app.controllers.reply_validation_controller import router as validation_router
 
 
-# ── Lifespan: runs once on startup ─────────────────────────────────────────────
+# ── Lifespan: runs once on startup ─────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create DB tables if they don't exist yet
     ensure_confirmed_demands_table()
     yield
 
 
-# ── App init ───────────────────────────────────────────────────────────────────
+# ── App init ───────────────────────────────────────────────────────────────
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     lifespan=lifespan,
 )
 
-# ── Register routers ───────────────────────────────────────────────────────────
-app.include_router(webhook_router)
+# ── Register routers ───────────────────────────────────────────────────────
 app.include_router(validation_router)
 
 
-# ── Base routes ────────────────────────────────────────────────────────────────
+# ── Base routes ────────────────────────────────────────────────────────────
 @app.get("/")
 def home():
     return {

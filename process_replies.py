@@ -8,8 +8,8 @@ from app.services.attachment_parser_service import (
     parse_excel_file,
     is_excel_attachment,
 )
-
 from app.data.sku_data import load_sku_data
+from app.events.producers import emit_reply_received
 
 
 PRIMARY_SALES_FILE = "sample_data/Primary_Sales.xlsx"
@@ -17,17 +17,10 @@ RECOMMENDED_PRODUCTS_FILE = "sample_data/30_Recommended_New_Products.xlsx"
 
 
 def merge_attachment_items(parsed_data, attachment_items):
-    """
-    Rules:
-    1. If no attachment items -> keep text parsed result
-    2. If attachment items exist -> Excel becomes primary source
-    3. If text also has valid items, keep them only if SKU is not already in Excel
-    """
     if not attachment_items:
         return parsed_data
 
     text_items = parsed_data.get("items", []) or []
-
     final_items = []
     excel_sku_ids = set()
 
@@ -54,12 +47,10 @@ def merge_attachment_items(parsed_data, attachment_items):
 
 def process_all_replies():
     print("Loading SKU master data...")
-
     load_sku_data(
         primary_sales_file=PRIMARY_SALES_FILE,
         recommended_products_file=RECOMMENDED_PRODUCTS_FILE
     )
-
     print("SKU data loaded successfully")
 
     emails = read_unseen_replies()
@@ -105,10 +96,23 @@ def process_all_replies():
         print("Final Parsed Output:")
         pprint(parsed)
 
-        save_parsed_reply(
+        # Save to PostgreSQL — returns ID if new, None if already saved
+        saved_id = save_parsed_reply(
             raw_email=item,
             parsed_data=parsed
         )
+
+        # Only trigger RedPanda + Temporal for NEW demand replies
+        if saved_id is not None and parsed.get("reply_type") == "demand":
+            print(f"Emitting ReplyReceived event → distributor={parsed['distributor_id']} id={saved_id}")
+            try:
+                emit_reply_received(
+                    distributor_id=parsed["distributor_id"],
+                    parsed_reply_id=saved_id
+                )
+                print("Event emitted to RedPanda ✓")
+            except Exception as e:
+                print(f"RedPanda emit failed: {e}")
 
         if parsed.get("needs_followup"):
             print("Follow-up required for this reply.")

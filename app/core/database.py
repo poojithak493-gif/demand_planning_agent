@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import logging
 from datetime import date
 
-load_dotenv()
+load_dotenv(override=False)
 
 logger = logging.getLogger(__name__)
 
