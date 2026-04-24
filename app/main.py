@@ -1,16 +1,65 @@
 from fastapi import FastAPI
-from app.controllers.distributor_controller import router as distributor_router
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Demand Planning Agent")
+from app.core.config import settings
+from app.core.database import ensure_confirmed_demands_table
+from app.services.send_demand_email_service import send_email, send_bulk_emails
 
-app.include_router(distributor_router)
+# ── Routers ────────────────────────────────────────────────────────────────
+from app.controllers.reply_validation_controller import router as validation_router
 
 
+# ── Lifespan: runs once on startup ─────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    ensure_confirmed_demands_table()
+    yield
+
+
+# ── App init ───────────────────────────────────────────────────────────────
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    lifespan=lifespan,
+)
+
+# ── Register routers ───────────────────────────────────────────────────────
+app.include_router(validation_router)
+
+
+# ── Base routes ────────────────────────────────────────────────────────────
 @app.get("/")
-def health_check():
-    return {"message": "Demand Planning Agent is running"}
+def home():
+    return {
+        "message": f"{settings.APP_NAME} is running",
+        "version": settings.APP_VERSION,
+    }
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+def health_check():
+    return {
+        "status": "success",
+        "message": "Application startup complete.",
+    }
+
+
+@app.get("/send-test")
+def send_test():
+    return send_email(
+        to_email="demo@postal.local",
+        subject="Test Email from Demand Planning Agent",
+        body="Hello, this is a test email sent from FastAPI using Gmail SMTP.",
+    )
+
+
+@app.get("/send-bulk")
+def send_bulk():
+    distributors = [
+        {"id": "D01", "email": "revanbejagam@gmail.com"},
+        {"id": "D02", "email": "rishithareddyc2002@gmail.com"},
+        {"id": "D03", "email": "Saherwardi.mustafa@gmail.com"},
+        {"id": "D04", "email": "lingaphani21@gmail.com"},
+        {"id": "D05", "email": "poojithak493@gmail.com"},
+    ]
+    return send_bulk_emails(distributors)

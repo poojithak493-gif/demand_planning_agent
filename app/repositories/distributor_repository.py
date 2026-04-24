@@ -1,29 +1,10 @@
-from sqlalchemy import text
-from app.core.database import SessionLocal
-
+from app.models.distributor import Distributor
 
 class DistributorRepository:
-    def get_by_code(self, distributor_code: str) -> dict | None:
-        query = text("""
-            SELECT
-                distributor_id,
-                distributor_code,
-                name,
-                email,
-                phone,
-                region,
-                priority,
-                is_active
-            FROM distributors
-            WHERE distributor_code = :distributor_code
-              AND is_active = TRUE
-            LIMIT 1
-        """)
+    def __init__(self, db):
+        self.db = db
 
-        with SessionLocal() as session:
-            row = session.execute(
-                query,
-                {"distributor_code": distributor_code}
-            ).mappings().first()
-
-            return dict(row) if row else None
+    def get_by_distributor_id(self, distributor_id: str):
+        return self.db.query(Distributor).filter(
+            Distributor.distributor_id == distributor_id
+        ).first()

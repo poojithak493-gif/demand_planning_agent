@@ -1,10 +1,10 @@
 from temporalio import activity
 
 from app.core.database import SessionLocal
-from app.services.build_demand_email_service import BuildDemandEmailService
 from app.services.fetch_distributor_context_service import FetchDistributorContextService
-from app.services.send_demand_email_service import SendDemandEmailService
 from app.services.sku_recommendation_service import SKURecommendationService
+from app.services.build_demand_email_service import build_demand_email
+from app.services.send_demand_email_service import send_email
 
 
 @activity.defn
@@ -25,14 +25,14 @@ def graph_recommendation_activity(distributor_id: str):
 
 @activity.defn
 def build_email_activity(context: dict, recommendations: dict):
-    service = BuildDemandEmailService()
-    return service.execute(context, recommendations)
+    distributor_id = context.get("distributor_id")
+    distributor_email = context.get("email")
+    return build_demand_email(distributor_id, distributor_email)
 
 
 @activity.defn
 def send_email_activity(to_email: str, email_payload: dict):
-    service = SendDemandEmailService()
-    return service.execute(
+    return send_email(
         to_email=to_email,
         subject=email_payload["subject"],
         body=email_payload["body"]
