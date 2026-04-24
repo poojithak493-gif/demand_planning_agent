@@ -13,7 +13,7 @@ SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
 
 # Excel attachment path
-DEMAND_ATTACHMENT_PATH = r"C:\Users\rishi\OneDrive\Documents\GitHub\demand_planning_agent\DEMAND.xlsx"
+DEMAND_ATTACHMENT_PATH = r"C:\Users\revan\Desktop\demand_planning_agent\DEMAND.xlsx"
 
 
 def send_email(to_email, subject, body, attachment_path=None):
