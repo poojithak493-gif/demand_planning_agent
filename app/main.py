@@ -1,39 +1,58 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.database import ensure_confirmed_demands_table
 from app.services.send_demand_email_service import send_email, send_bulk_emails
 
-# ── Routers ────────────────────────────────────────────────────────────────
 from app.controllers.reply_validation_controller import router as validation_router
 
+from view_data import get_all_replies
 
-# ── Lifespan: runs once on startup ─────────────────────────────────────────
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     ensure_confirmed_demands_table()
     yield
 
 
-# ── App init ───────────────────────────────────────────────────────────────
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     lifespan=lifespan,
 )
 
-# ── Register routers ───────────────────────────────────────────────────────
 app.include_router(validation_router)
 
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ── Base routes ────────────────────────────────────────────────────────────
+
 @app.get("/")
 def home():
     return {
         "message": f"{settings.APP_NAME} is running",
         "version": settings.APP_VERSION,
     }
+
+
+@app.get("/dashboard")
+def dashboard(request: Request):
+    print("Dashboard API called")
+
+    rows = get_all_replies()
+
+    print(f"Fetched {len(rows)} rows from database")
+
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {
+            "request": request,
+            "rows": rows,
+        },
+    )
 
 
 @app.get("/health")
@@ -62,4 +81,5 @@ def send_bulk():
         {"id": "D04", "email": "lingaphani21@gmail.com"},
         {"id": "D05", "email": "poojithak493@gmail.com"},
     ]
+
     return send_bulk_emails(distributors)
