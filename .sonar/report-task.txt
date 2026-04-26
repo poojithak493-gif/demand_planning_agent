@@ -1,0 +1,6 @@
+projectKey=Demand_Planning_Agent
+serverUrl=http://localhost:9000
+serverVersion=26.4.0.121862
+dashboardUrl=http://localhost:9000/dashboard?id=Demand_Planning_Agent
+ceTaskId=a7061ae2-c71b-463c-b302-6e3b10c6316b
+ceTaskUrl=http://localhost:9000/api/ce/task?id=a7061ae2-c71b-463c-b302-6e3b10c6316b

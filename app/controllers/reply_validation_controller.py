@@ -1,6 +1,5 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-import psycopg2
 from app.core.database import get_connection
 
 router = APIRouter(prefix="/reply-validation", tags=["Reply Validation"])
@@ -18,27 +17,39 @@ def status():
 @router.post("/validate")
 def validate_reply(request: ValidateRequest):
     conn = get_connection()
+
     try:
         with conn.cursor() as cur:
-            # Get the parsed reply
-            cur.execute("""
+            # Get parsed reply
+            cur.execute(
+                """
                 SELECT id, distributor_id, reply_type, confidence, needs_followup
                 FROM parsed_replies
                 WHERE id = %s
-            """, (request.parsed_reply_id,))
+                """,
+                (request.parsed_reply_id,),
+            )
+
             reply = cur.fetchone()
 
             if not reply:
-                return {"status": "invalid", "reason": "Reply not found"}
+                return {
+                    "status": "invalid",
+                    "reason": "Reply not found"
+                }
 
-            reply_id, distributor_id, reply_type, confidence, needs_followup = reply
+            reply_id, distributor_id, reply_type, confidence, _ = reply
 
-            # Get the items
-            cur.execute("""
+            # Get items
+            cur.execute(
+                """
                 SELECT sku_id, sku_name, quantity
                 FROM parsed_reply_items
                 WHERE parsed_reply_id = %s
-            """, (reply_id,))
+                """,
+                (reply_id,),
+            )
+
             items = cur.fetchall()
 
             # Validation rules
@@ -48,7 +59,7 @@ def validate_reply(request: ValidateRequest):
                     "reason": f"Reply type is {reply_type}, not demand",
                     "distributor_id": distributor_id,
                     "total_confirmed_qty": 0,
-                    "items": []
+                    "items": [],
                 }
 
             if not items:
@@ -57,7 +68,7 @@ def validate_reply(request: ValidateRequest):
                     "reason": "No items found in reply",
                     "distributor_id": distributor_id,
                     "total_confirmed_qty": 0,
-                    "items": []
+                    "items": [],
                 }
 
             total_qty = sum(item[2] for item in items if item[2])
@@ -69,9 +80,13 @@ def validate_reply(request: ValidateRequest):
                 "confidence": float(confidence),
                 "total_confirmed_qty": total_qty,
                 "items": [
-                    {"sku_id": i[0], "sku_name": i[1], "quantity": i[2]}
-                    for i in items
-                ]
+                    {
+                        "sku_id": item[0],
+                        "sku_name": item[1],
+                        "quantity": item[2],
+                    }
+                    for item in items
+                ],
             }
 
     finally:
