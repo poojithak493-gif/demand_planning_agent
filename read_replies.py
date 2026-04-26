@@ -173,7 +173,7 @@ def read_unseen_replies():
     mail.login(EMAIL_ADDRESS, EMAIL_APP_PASSWORD)
     mail.select("inbox")
 
-    status, messages = mail.search(None, '(SUBJECT "Demand Request")')
+    status, messages = mail.search(None, '(SUBJECT "Re: Demand Request")')
 
     if status != "OK":
         mail.logout()
